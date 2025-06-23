@@ -2,37 +2,38 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Resolver Ecuaciones Lineales y Cuadráticas</title>
+  <title>Resolución de Ecuaciones Lineales y Cuadráticas</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 30px;
+      padding: 20px;
+    }
+    label, input, select {
+      margin: 5px;
     }
     canvas {
-      max-width: 700px;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <h2>Resolución de Ecuaciones Lineales y Cuadráticas</h2>
-  <p>Formato aceptado: ax + b = 0 (lineal) o ax² + bx + c = 0 (cuadrática)</p>
-  
-  <label for="tipo">Tipo de ecuación:</label>
-  <select id="tipo">
-    <option value="lineal">Lineal</option>
-    <option value="cuadratica">Cuadrática</option>
-  </select><br><br>
+  <h2>Resolver Ecuaciones Lineales y Cuadráticas</h2>
 
-  <label for="a">a:</label>
-  <input type="number" id="a" step="any">
-  <label for="b">b:</label>
-  <input type="number" id="b" step="any">
-  <label for="c">c (solo para cuadrática):</label>
-  <input type="number" id="c" step="any"><br><br>
+  <label>Tipo de ecuación:</label>
+  <select id="tipo">
+    <option value="lineal">Lineal (ax + b)</option>
+    <option value="cuadratica">Cuadrática (ax² + bx + c)</option>
+  </select><br>
+
+  <label>a:</label><input type="number" id="a" value="1">
+  <label>b:</label><input type="number" id="b" value="0">
+  <label>c:</label><input type="number" id="c" value="0"><br><br>
 
   <button onclick="resolver()">Resolver</button>
-  <h3>Resultado:</h3>
+
+  <h3>Detalles:</h3>
+  <p id="ecuacion"></p>
   <p id="resultado"></p>
   <p id="dominio"></p>
   <p id="rango"></p>
@@ -40,85 +41,97 @@
   <canvas id="grafica" width="700" height="400"></canvas>
 
   <script>
+    let chart;
+
     function resolver() {
       const tipo = document.getElementById("tipo").value;
       const a = parseFloat(document.getElementById("a").value);
       const b = parseFloat(document.getElementById("b").value);
       const c = parseFloat(document.getElementById("c").value);
+
       const resultado = document.getElementById("resultado");
       const dominio = document.getElementById("dominio");
       const rango = document.getElementById("rango");
+      const ecuacion = document.getElementById("ecuacion");
 
-      let xVals = [], yVals = [], roots = "";
+      let xVals = [], yVals = [];
+      let ymin = Infinity, ymax = -Infinity;
+
       for (let x = -20; x <= 20; x += 0.5) {
-        if (tipo === "lineal") {
-          yVals.push(a * x + b);
-        } else {
-          yVals.push(a * x * x + b * x + c);
-        }
+        let y = tipo === "lineal" ? a * x + b : a * x * x + b * x + c;
         xVals.push(x);
+        yVals.push(y);
+        if (y < ymin) ymin = y;
+        if (y > ymax) ymax = y;
       }
 
-      // Resolución algebraica
+      // Mostrar ecuación
+      let eqText = tipo === "lineal"
+        ? `f(x) = ${a}x ${b >= 0 ? "+" : "-"} ${Math.abs(b)}`
+        : `f(x) = ${a}x² ${b >= 0 ? "+" : "-"} ${Math.abs(b)}x ${c >= 0 ? "+" : "-"} ${Math.abs(c)}`;
+      ecuacion.textContent = `Ecuación: ${eqText}`;
+
+      // Mostrar soluciones
       if (tipo === "lineal") {
         if (a !== 0) {
           const x = -b / a;
-          roots = `x = ${x.toFixed(2)}`;
+          resultado.textContent = `Raíz: x = ${x.toFixed(2)}`;
         } else {
-          roots = b === 0 ? "Infinitas soluciones" : "Sin solución";
+          resultado.textContent = b === 0 ? "Infinitas soluciones" : "Sin solución";
         }
-        rango.textContent = "Rango: Todos los números reales";
       } else {
-        const discriminante = b * b - 4 * a * c;
-        if (discriminante > 0) {
-          const x1 = (-b + Math.sqrt(discriminante)) / (2 * a);
-          const x2 = (-b - Math.sqrt(discriminante)) / (2 * a);
-          roots = `x₁ = ${x1.toFixed(2)}, x₂ = ${x2.toFixed(2)}`;
-        } else if (discriminante === 0) {
+        const d = b * b - 4 * a * c;
+        if (d > 0) {
+          const x1 = (-b + Math.sqrt(d)) / (2 * a);
+          const x2 = (-b - Math.sqrt(d)) / (2 * a);
+          resultado.textContent = `Raíces: x₁ = ${x1.toFixed(2)}, x₂ = ${x2.toFixed(2)}`;
+        } else if (d === 0) {
           const x = -b / (2 * a);
-          roots = `x = ${x.toFixed(2)} (raíz doble)`;
+          resultado.textContent = `Raíz doble: x = ${x.toFixed(2)}`;
         } else {
-          roots = "Raíces complejas (no se grafican)";
+          resultado.textContent = "Raíces complejas (no se grafican)";
         }
-        const yValsFiltered = yVals.slice();
-        rango.textContent = `Rango: Desde ${Math.min(...yValsFiltered).toFixed(2)} hasta ${Math.max(...yValsFiltered).toFixed(2)}`;
       }
 
-      resultado.textContent = `Raíz/Raíces: ${roots}`;
-      dominio.textContent = "Dominio: De -∞ a ∞";
+      // Mostrar dominio y rango
+      dominio.textContent = `Dominio: [-20, 20]`;
+      rango.textContent = `Rango aproximado: [${ymin.toFixed(2)}, ${ymax.toFixed(2)}]`;
 
-      dibujarGrafica(xVals, yVals);
-    }
-
-    let chart;
-    function dibujarGrafica(x, y) {
-      const ctx = document.getElementById('grafica').getContext('2d');
+      // Graficar
+      const ctx = document.getElementById("grafica").getContext("2d");
       if (chart) chart.destroy();
       chart = new Chart(ctx, {
-        type: 'line',
+        type: "line",
         data: {
-          labels: x,
+          labels: xVals,
           datasets: [{
             label: 'f(x)',
-            data: y,
-            borderColor: 'blue',
+            data: yVals,
+            borderColor: "blue",
+            borderWidth: 2,
             fill: false,
-            tension: 0.1
+            pointRadius: 0
           }]
         },
         options: {
+          responsive: false,
           scales: {
             x: {
               type: 'linear',
               min: -20,
               max: 20,
-              title: { display: true, text: 'x' }
+              title: { display: true, text: "x" },
+              ticks: { stepSize: 5 }
             },
             y: {
               min: -20,
               max: 20,
-              title: { display: true, text: 'f(x)' }
+              title: { display: true, text: "f(x)" },
+              ticks: { stepSize: 5 }
             }
+          },
+          plugins: {
+            legend: { display: false }
           }
         }
       });
@@ -126,4 +139,3 @@
   </script>
 </body>
 </html>
-
