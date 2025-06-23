@@ -2,26 +2,22 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Resolver Ecuaciones (Texto)</title>
+  <title>Graficador de Funciones</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
   <style>
     body { font-family: Arial; padding: 20px; }
+    input, button { margin: 10px 0; width: 300px; }
     canvas { margin-top: 20px; }
-    input, button { margin: 5px; width: 300px; }
   </style>
 </head>
 <body>
-  <h2>Resolver Ecuaciones Lineales y Cuadráticas</h2>
-  <p>Ejemplos válidos: <br>
-    `x + 2 = 0` &nbsp;&nbsp;&nbsp;&nbsp;`1/2x² - 4x + 3 = 0` &nbsp;&nbsp;&nbsp;&nbsp;`-3x^2 + x = 0`
-  </p>
 
-  <input type="text" id="ecuacion" placeholder="Escribe la ecuación (ax² + bx + c = 0)">
-  <button onclick="resolver()">Resolver</button>
+  <h2>Graficador de funciones algebraicas</h2>
+  <p>Ejemplos: <code>2 / (x - 2)</code>, <code>x^2 - 4x + 3</code>, <code>sqrt(x)</code>, <code>abs(x)</code></p>
+  <input type="text" id="funcion" placeholder="Escribe f(x), por ejemplo: 2 / (x - 2)">
+  <button onclick="graficar()">Graficar</button>
 
-  <h3>Detalles:</h3>
-  <p id="mostrarEcuacion"></p>
-  <p id="resultado"></p>
   <p id="dominio"></p>
   <p id="rango"></p>
 
@@ -30,111 +26,49 @@
   <script>
     let chart;
 
-    function parseEcuacion(input) {
-      input = input.replace(/\s+/g, '').replace('=0', '').replace('²', '^2');
+    function graficar() {
+      const expr = document.getElementById("funcion").value;
+      const f = math.compile(expr);
+      const xVals = [];
+      const yVals = [];
 
-      const fracToDecimal = str => {
-        if (str.includes('/')) {
-          const [num, den] = str.split('/');
-          return parseFloat(num) / parseFloat(den);
-        }
-        return parseFloat(str);
-      };
-
-      let a = 0, b = 0, c = 0;
-
-      // Buscar términos
-      const regexA = /([+\-]?[^+\-]*)x\^2/;
-      const regexB = /([+\-]?[^+\-]*)x(?![\^])/;
-      const regexC = /([+\-]?[^+\-]+)(?!x)/g;
-
-      const matchA = input.match(regexA);
-      if (matchA) {
-        let val = matchA[1] === "+" || matchA[1] === "" ? "1" : (matchA[1] === "-" ? "-1" : matchA[1]);
-        a = fracToDecimal(val);
-      }
-
-      const matchB = input.match(regexB);
-      if (matchB) {
-        let val = matchB[1] === "+" || matchB[1] === "" ? "1" : (matchB[1] === "-" ? "-1" : matchB[1]);
-        b = fracToDecimal(val);
-      }
-
-      // Eliminar términos ya encontrados
-      let sinAB = input.replace(regexA, '').replace(regexB, '');
-      const matchesC = sinAB.match(regexC);
-      if (matchesC) {
-        c = matchesC.map(fracToDecimal).reduce((sum, val) => sum + val, 0);
-      }
-
-      // Si no hay x², es lineal
-      const tipo = a !== 0 ? "cuadratica" : "lineal";
-
-      return { a, b, c, tipo };
-    }
-
-    function resolver() {
-      const input = document.getElementById("ecuacion").value;
-      const parsed = parseEcuacion(input);
-      const { a, b, c, tipo } = parsed;
-
-      const resultado = document.getElementById("resultado");
-      const dominio = document.getElementById("dominio");
-      const rango = document.getElementById("rango");
-      const mostrarEcuacion = document.getElementById("mostrarEcuacion");
-
-      let xVals = [], yVals = [];
       let ymin = Infinity, ymax = -Infinity;
+      let dominioCount = 0;
 
-      for (let x = -20; x <= 20; x += 0.5) {
-        let y = tipo === "lineal" ? b * x + c : a * x * x + b * x + c;
-        xVals.push(x);
-        yVals.push(y);
-        if (y < ymin) ymin = y;
-        if (y > ymax) ymax = y;
-      }
-
-      // Mostrar ecuación
-      mostrarEcuacion.textContent = `Ecuación interpretada: f(x) = ${a}x² + ${b}x + ${c}`;
-
-      // Calcular soluciones
-      if (tipo === "lineal") {
-        if (b !== 0) {
-          const x = -c / b;
-          resultado.textContent = `Raíz: x = ${x.toFixed(2)}`;
-        } else {
-          resultado.textContent = c === 0 ? "Infinitas soluciones" : "Sin solución";
-        }
-      } else {
-        const d = b * b - 4 * a * c;
-        if (d > 0) {
-          const x1 = (-b + Math.sqrt(d)) / (2 * a);
-          const x2 = (-b - Math.sqrt(d)) / (2 * a);
-          resultado.textContent = `Raíces: x₁ = ${x1.toFixed(2)}, x₂ = ${x2.toFixed(2)}`;
-        } else if (d === 0) {
-          const x = -b / (2 * a);
-          resultado.textContent = `Raíz doble: x = ${x.toFixed(2)}`;
-        } else {
-          resultado.textContent = "Raíces complejas (no se grafican)";
+      for (let x = -20; x <= 20; x += 0.1) {
+        try {
+          const y = f.evaluate({ x });
+          if (typeof y === 'number' && isFinite(y)) {
+            xVals.push(x);
+            yVals.push({ x: x, y: y });
+            ymin = Math.min(ymin, y);
+            ymax = Math.max(ymax, y);
+            dominioCount++;
+          }
+        } catch (e) {
+          // Salta valores fuera del dominio
         }
       }
 
-      dominio.textContent = "Dominio: [-20, 20]";
-      rango.textContent = `Rango aproximado: [${ymin.toFixed(2)}, ${ymax.toFixed(2)}]`;
+      document.getElementById("dominio").textContent =
+        dominioCount === 0 ? "Dominio: No definido en este rango." :
+        "Dominio: Todos los x en [-20, 20] donde la función existe.";
 
-      // Gráfico
+      document.getElementById("rango").textContent =
+        dominioCount === 0 ? "" :
+        `Rango aproximado: de ${ymin.toFixed(2)} a ${ymax.toFixed(2)}`;
+
       const ctx = document.getElementById("grafica").getContext("2d");
       if (chart) chart.destroy();
       chart = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: xVals,
           datasets: [{
             label: 'f(x)',
             data: yVals,
             borderColor: 'blue',
-            fill: false,
-            pointRadius: 0
+            pointRadius: 0,
+            fill: false
           }]
         },
         options: {
