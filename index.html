@@ -1,1 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Resolver Ecuaciones Lineales y Cuadráticas</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 30px;
+    }
+    canvas {
+      max-width: 700px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Resolución de Ecuaciones Lineales y Cuadráticas</h2>
+  <p>Formato aceptado: ax + b = 0 (lineal) o ax² + bx + c = 0 (cuadrática)</p>
+  
+  <label for="tipo">Tipo de ecuación:</label>
+  <select id="tipo">
+    <option value="lineal">Lineal</option>
+    <option value="cuadratica">Cuadrática</option>
+  </select><br><br>
+
+  <label for="a">a:</label>
+  <input type="number" id="a" step="any">
+  <label for="b">b:</label>
+  <input type="number" id="b" step="any">
+  <label for="c">c (solo para cuadrática):</label>
+  <input type="number" id="c" step="any"><br><br>
+
+  <button onclick="resolver()">Resolver</button>
+  <h3>Resultado:</h3>
+  <p id="resultado"></p>
+  <p id="dominio"></p>
+  <p id="rango"></p>
+
+  <canvas id="grafica" width="700" height="400"></canvas>
+
+  <script>
+    function resolver() {
+      const tipo = document.getElementById("tipo").value;
+      const a = parseFloat(document.getElementById("a").value);
+      const b = parseFloat(document.getElementById("b").value);
+      const c = parseFloat(document.getElementById("c").value);
+      const resultado = document.getElementById("resultado");
+      const dominio = document.getElementById("dominio");
+      const rango = document.getElementById("rango");
+
+      let xVals = [], yVals = [], roots = "";
+      for (let x = -20; x <= 20; x += 0.5) {
+        if (tipo === "lineal") {
+          yVals.push(a * x + b);
+        } else {
+          yVals.push(a * x * x + b * x + c);
+        }
+        xVals.push(x);
+      }
+
+      // Resolución algebraica
+      if (tipo === "lineal") {
+        if (a !== 0) {
+          const x = -b / a;
+          roots = `x = ${x.toFixed(2)}`;
+        } else {
+          roots = b === 0 ? "Infinitas soluciones" : "Sin solución";
+        }
+        rango.textContent = "Rango: Todos los números reales";
+      } else {
+        const discriminante = b * b - 4 * a * c;
+        if (discriminante > 0) {
+          const x1 = (-b + Math.sqrt(discriminante)) / (2 * a);
+          const x2 = (-b - Math.sqrt(discriminante)) / (2 * a);
+          roots = `x₁ = ${x1.toFixed(2)}, x₂ = ${x2.toFixed(2)}`;
+        } else if (discriminante === 0) {
+          const x = -b / (2 * a);
+          roots = `x = ${x.toFixed(2)} (raíz doble)`;
+        } else {
+          roots = "Raíces complejas (no se grafican)";
+        }
+        const yValsFiltered = yVals.slice();
+        rango.textContent = `Rango: Desde ${Math.min(...yValsFiltered).toFixed(2)} hasta ${Math.max(...yValsFiltered).toFixed(2)}`;
+      }
+
+      resultado.textContent = `Raíz/Raíces: ${roots}`;
+      dominio.textContent = "Dominio: De -∞ a ∞";
+
+      dibujarGrafica(xVals, yVals);
+    }
+
+    let chart;
+    function dibujarGrafica(x, y) {
+      const ctx = document.getElementById('grafica').getContext('2d');
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: x,
+          datasets: [{
+            label: 'f(x)',
+            data: y,
+            borderColor: 'blue',
+            fill: false,
+            tension: 0.1
+          }]
+        },
+        options: {
+          scales: {
+            x: {
+              type: 'linear',
+              min: -20,
+              max: 20,
+              title: { display: true, text: 'x' }
+            },
+            y: {
+              min: -20,
+              max: 20,
+              title: { display: true, text: 'f(x)' }
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
 
