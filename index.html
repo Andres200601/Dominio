@@ -1,26 +1,25 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Graficador con asíntotas</title>
+  <meta charset="UTF-8" />
+  <title>Graficador de Funciones (dominio y rango automáticos)</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
   <style>
     body { font-family: Arial; padding: 20px; }
+    input, button { width: 400px; padding: 8px; margin-bottom: 10px; }
     canvas { margin-top: 20px; }
-    input, button { margin: 10px 0; width: 400px; }
+    p { margin: 5px 0; }
   </style>
 </head>
 <body>
 
-  <h2>Graficador de funciones con asíntotas</h2>
-  <input type="text" id="funcion" placeholder="Ejemplo: 2 / (x - 2)">
-  <button onclick="graficar()">Graficar</button>
+  <h2>Graficador de Funciones (dominio y rango automáticos)</h2>
+  <input id="funcion" type="text" placeholder="Ej: 2 / (x - 2)" value="2 / (x - 2)" />
+  <button onclick="graficar()">Graficar función</button>
 
   <p id="dominio"></p>
   <p id="rango"></p>
-  <p id="asintotasV"></p>
-  <p id="asintotasH"></p>
 
   <canvas id="grafica" width="700" height="400"></canvas>
 
@@ -28,94 +27,83 @@
     let chart;
 
     function graficar() {
-      const expr = document.getElementById("funcion").value;
-      const f = math.compile(expr);
+      const expr = document.getElementById("funcion").value.trim();
+      const parsed = math.compile(expr);
 
-      const xs = [];
-      const pts = [];
-      let ymin = Infinity, ymax = -Infinity;
-      const asV = new Set();
-      const yLimits = [];
+      const xVals = [];
+      const yVals = [];
 
-      for (let x = -20; x <= 20; x += 0.05) {
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+
+      // Barrido de x entre -100 y 100 con paso pequeño para mayor rango
+      for (let x = -100; x <= 100; x += 0.1) {
         try {
-          const y = f.evaluate({ x });
-          if (typeof y === 'number' && isFinite(y)) {
-            xs.push(x);
-            pts.push({ x, y });
-            ymin = Math.min(ymin, y);
-            ymax = Math.max(ymax, y);
-          } else {
-            asV.add(parseFloat(x.toFixed(2)));
+          const y = parsed.evaluate({ x });
+          if (isFinite(y)) {
+            xVals.push(x);
+            yVals.push({ x: x, y: y });
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
           }
         } catch (e) {
-          // Dominio roto: x es una asíntota vertical
-          asV.add(parseFloat(x.toFixed(2)));
+          // Ignorar valores no definidos (dominio restringido)
         }
       }
 
-      const asH = [];
-      // Aproximar asíntota horizontal con límite en extremos
-      ['-20', '20'].forEach(limit => {
-        let y0;
-        try {
-          y0 = f.evaluate({ x: parseFloat(limit) });
-          if (isFinite(y0)) asH.push(y0);
-        } catch {}
-      });
-      const asHit = Math.abs(asH[0] - asH[1]) < 0.5 ? ((asH[0] + asH[1]) / 2).toFixed(2) : null;
-
-      document.getElementById("dominio").textContent = "Dominio: valores de x en [-20,20] donde f existe";
-      document.getElementById("rango").textContent = `Rango: [${ymin.toFixed(2)}, ${ymax.toFixed(2)}]`;
-      document.getElementById("asintotasV").textContent = asV.size
-        ? "Asíntotas verticales aprox. en x = " + [...asV].map(v => v.toFixed(2)).join(', ')
-        : "No se detectan asíntotas verticales";
-      document.getElementById("asintotasH").textContent = asHit
-        ? `Asíntota horizontal aprox.: y = ${asHit}`
-        : "No se detecta asíntota horizontal";
-
-      const lines = [];
-      asV.forEach(x0 => {
-        lines.push({
-          type: 'line',
-          xMin: x0, xMax: x0,
-          borderColor: 'red',
-          borderDash: [5,5],
-          label: { content: `x=${x0}`, enabled: true, position: 'start' }
-        });
-      });
-      if (asHit) {
-        lines.push({
-          type: 'line',
-          yMin: parseFloat(asHit),
-          yMax: parseFloat(asHit),
-          borderColor: 'green',
-          borderDash: [5,5],
-          label: { content:`y=${asHit}`, enabled: true, position: 'start' }
-        });
+      if (xVals.length === 0) {
+        document.getElementById("dominio").textContent = "Dominio: función no definida en el rango explorado.";
+        document.getElementById("rango").textContent = "";
+        if(chart) chart.destroy();
+        return;
       }
+
+      document.getElementById("dominio").textContent =
+        `Dominio aproximado en: [${minX.toFixed(2)}, ${maxX.toFixed(2)}] (puntos con valores definidos)`;
+      document.getElementById("rango").textContent =
+        `Rango aproximado en: [${minY.toFixed(2)}, ${maxY.toFixed(2)}]`;
 
       const ctx = document.getElementById("grafica").getContext("2d");
       if (chart) chart.destroy();
       chart = new Chart(ctx, {
-        type: 'scatter',
-        data: { datasets: [{ label:'f(x)', data: pts, borderColor:'blue', showLine:true, pointRadius:0 }] },
+        type: "scatter",
+        data: {
+          datasets: [{
+            label: "f(x)",
+            data: yVals,
+            borderColor: "blue",
+            showLine: true,
+            pointRadius: 0,
+            fill: false,
+            tension: 0.1
+          }]
+        },
         options: {
           responsive: false,
           scales: {
-            x: { type:'linear', min:-20, max:20, title:{ display:true, text:'x' } },
-            y: { min:-20, max:20, title:{ display:true, text:'f(x)' } }
+            x: {
+              type: "linear",
+              min: minX,
+              max: maxX,
+              title: { display: true, text: "x" }
+            },
+            y: {
+              min: minY,
+              max: maxY,
+              title: { display: true, text: "f(x)" }
+            }
           },
           plugins: {
-            legend: { display:false },
-            annotation: { annotations: lines }
+            legend: { display: false }
           }
-        },
-        plugins: [Chart.registry.getPlugin('annotation')]
+        }
       });
     }
   </script>
 
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2"></script>
 </body>
 </html>
