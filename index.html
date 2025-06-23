@@ -2,24 +2,25 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Graficador de Funciones</title>
+  <title>Graficador con asíntotas</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
   <style>
     body { font-family: Arial; padding: 20px; }
-    input, button { margin: 10px 0; width: 300px; }
     canvas { margin-top: 20px; }
+    input, button { margin: 10px 0; width: 400px; }
   </style>
 </head>
 <body>
 
-  <h2>Graficador de funciones algebraicas</h2>
-  <p>Ejemplos: <code>2 / (x - 2)</code>, <code>x^2 - 4x + 3</code>, <code>sqrt(x)</code>, <code>abs(x)</code></p>
-  <input type="text" id="funcion" placeholder="Escribe f(x), por ejemplo: 2 / (x - 2)">
+  <h2>Graficador de funciones con asíntotas</h2>
+  <input type="text" id="funcion" placeholder="Ejemplo: 2 / (x - 2)">
   <button onclick="graficar()">Graficar</button>
 
   <p id="dominio"></p>
   <p id="rango"></p>
+  <p id="asintotasV"></p>
+  <p id="asintotasH"></p>
 
   <canvas id="grafica" width="700" height="400"></canvas>
 
@@ -29,71 +30,92 @@
     function graficar() {
       const expr = document.getElementById("funcion").value;
       const f = math.compile(expr);
-      const xVals = [];
-      const yVals = [];
 
+      const xs = [];
+      const pts = [];
       let ymin = Infinity, ymax = -Infinity;
-      let dominioCount = 0;
+      const asV = new Set();
+      const yLimits = [];
 
-      for (let x = -20; x <= 20; x += 0.1) {
+      for (let x = -20; x <= 20; x += 0.05) {
         try {
           const y = f.evaluate({ x });
           if (typeof y === 'number' && isFinite(y)) {
-            xVals.push(x);
-            yVals.push({ x: x, y: y });
+            xs.push(x);
+            pts.push({ x, y });
             ymin = Math.min(ymin, y);
             ymax = Math.max(ymax, y);
-            dominioCount++;
+          } else {
+            asV.add(parseFloat(x.toFixed(2)));
           }
         } catch (e) {
-          // Salta valores fuera del dominio
+          // Dominio roto: x es una asíntota vertical
+          asV.add(parseFloat(x.toFixed(2)));
         }
       }
 
-      document.getElementById("dominio").textContent =
-        dominioCount === 0 ? "Dominio: No definido en este rango." :
-        "Dominio: Todos los x en [-20, 20] donde la función existe.";
+      const asH = [];
+      // Aproximar asíntota horizontal con límite en extremos
+      ['-20', '20'].forEach(limit => {
+        let y0;
+        try {
+          y0 = f.evaluate({ x: parseFloat(limit) });
+          if (isFinite(y0)) asH.push(y0);
+        } catch {}
+      });
+      const asHit = Math.abs(asH[0] - asH[1]) < 0.5 ? ((asH[0] + asH[1]) / 2).toFixed(2) : null;
 
-      document.getElementById("rango").textContent =
-        dominioCount === 0 ? "" :
-        `Rango aproximado: de ${ymin.toFixed(2)} a ${ymax.toFixed(2)}`;
+      document.getElementById("dominio").textContent = "Dominio: valores de x en [-20,20] donde f existe";
+      document.getElementById("rango").textContent = `Rango: [${ymin.toFixed(2)}, ${ymax.toFixed(2)}]`;
+      document.getElementById("asintotasV").textContent = asV.size
+        ? "Asíntotas verticales aprox. en x = " + [...asV].map(v => v.toFixed(2)).join(', ')
+        : "No se detectan asíntotas verticales";
+      document.getElementById("asintotasH").textContent = asHit
+        ? `Asíntota horizontal aprox.: y = ${asHit}`
+        : "No se detecta asíntota horizontal";
+
+      const lines = [];
+      asV.forEach(x0 => {
+        lines.push({
+          type: 'line',
+          xMin: x0, xMax: x0,
+          borderColor: 'red',
+          borderDash: [5,5],
+          label: { content: `x=${x0}`, enabled: true, position: 'start' }
+        });
+      });
+      if (asHit) {
+        lines.push({
+          type: 'line',
+          yMin: parseFloat(asHit),
+          yMax: parseFloat(asHit),
+          borderColor: 'green',
+          borderDash: [5,5],
+          label: { content:`y=${asHit}`, enabled: true, position: 'start' }
+        });
+      }
 
       const ctx = document.getElementById("grafica").getContext("2d");
       if (chart) chart.destroy();
       chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          datasets: [{
-            label: 'f(x)',
-            data: yVals,
-            borderColor: 'blue',
-            pointRadius: 0,
-            fill: false
-          }]
-        },
+        type: 'scatter',
+        data: { datasets: [{ label:'f(x)', data: pts, borderColor:'blue', showLine:true, pointRadius:0 }] },
         options: {
           responsive: false,
           scales: {
-            x: {
-              type: 'linear',
-              min: -20,
-              max: 20,
-              title: { display: true, text: 'x' },
-              ticks: { stepSize: 5 }
-            },
-            y: {
-              min: -20,
-              max: 20,
-              title: { display: true, text: 'f(x)' },
-              ticks: { stepSize: 5 }
-            }
+            x: { type:'linear', min:-20, max:20, title:{ display:true, text:'x' } },
+            y: { min:-20, max:20, title:{ display:true, text:'f(x)' } }
           },
           plugins: {
-            legend: { display: false }
+            legend: { display:false },
+            annotation: { annotations: lines }
           }
-        }
+        },
+        plugins: [Chart.registry.getPlugin('annotation')]
       });
     }
   </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2"></script>
 </body>
 </html>
