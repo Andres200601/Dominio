@@ -2,38 +2,25 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Resolución de Ecuaciones Lineales y Cuadráticas</title>
+  <title>Resolver Ecuaciones (Texto)</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-    label, input, select {
-      margin: 5px;
-    }
-    canvas {
-      margin-top: 20px;
-    }
+    body { font-family: Arial; padding: 20px; }
+    canvas { margin-top: 20px; }
+    input, button { margin: 5px; width: 300px; }
   </style>
 </head>
 <body>
   <h2>Resolver Ecuaciones Lineales y Cuadráticas</h2>
+  <p>Ejemplos válidos: <br>
+    `x + 2 = 0` &nbsp;&nbsp;&nbsp;&nbsp;`1/2x² - 4x + 3 = 0` &nbsp;&nbsp;&nbsp;&nbsp;`-3x^2 + x = 0`
+  </p>
 
-  <label>Tipo de ecuación:</label>
-  <select id="tipo">
-    <option value="lineal">Lineal (ax + b)</option>
-    <option value="cuadratica">Cuadrática (ax² + bx + c)</option>
-  </select><br>
-
-  <label>a:</label><input type="number" id="a" value="1">
-  <label>b:</label><input type="number" id="b" value="0">
-  <label>c:</label><input type="number" id="c" value="0"><br><br>
-
+  <input type="text" id="ecuacion" placeholder="Escribe la ecuación (ax² + bx + c = 0)">
   <button onclick="resolver()">Resolver</button>
 
   <h3>Detalles:</h3>
-  <p id="ecuacion"></p>
+  <p id="mostrarEcuacion"></p>
   <p id="resultado"></p>
   <p id="dominio"></p>
   <p id="rango"></p>
@@ -43,22 +30,64 @@
   <script>
     let chart;
 
+    function parseEcuacion(input) {
+      input = input.replace(/\s+/g, '').replace('=0', '').replace('²', '^2');
+
+      const fracToDecimal = str => {
+        if (str.includes('/')) {
+          const [num, den] = str.split('/');
+          return parseFloat(num) / parseFloat(den);
+        }
+        return parseFloat(str);
+      };
+
+      let a = 0, b = 0, c = 0;
+
+      // Buscar términos
+      const regexA = /([+\-]?[^+\-]*)x\^2/;
+      const regexB = /([+\-]?[^+\-]*)x(?![\^])/;
+      const regexC = /([+\-]?[^+\-]+)(?!x)/g;
+
+      const matchA = input.match(regexA);
+      if (matchA) {
+        let val = matchA[1] === "+" || matchA[1] === "" ? "1" : (matchA[1] === "-" ? "-1" : matchA[1]);
+        a = fracToDecimal(val);
+      }
+
+      const matchB = input.match(regexB);
+      if (matchB) {
+        let val = matchB[1] === "+" || matchB[1] === "" ? "1" : (matchB[1] === "-" ? "-1" : matchB[1]);
+        b = fracToDecimal(val);
+      }
+
+      // Eliminar términos ya encontrados
+      let sinAB = input.replace(regexA, '').replace(regexB, '');
+      const matchesC = sinAB.match(regexC);
+      if (matchesC) {
+        c = matchesC.map(fracToDecimal).reduce((sum, val) => sum + val, 0);
+      }
+
+      // Si no hay x², es lineal
+      const tipo = a !== 0 ? "cuadratica" : "lineal";
+
+      return { a, b, c, tipo };
+    }
+
     function resolver() {
-      const tipo = document.getElementById("tipo").value;
-      const a = parseFloat(document.getElementById("a").value);
-      const b = parseFloat(document.getElementById("b").value);
-      const c = parseFloat(document.getElementById("c").value);
+      const input = document.getElementById("ecuacion").value;
+      const parsed = parseEcuacion(input);
+      const { a, b, c, tipo } = parsed;
 
       const resultado = document.getElementById("resultado");
       const dominio = document.getElementById("dominio");
       const rango = document.getElementById("rango");
-      const ecuacion = document.getElementById("ecuacion");
+      const mostrarEcuacion = document.getElementById("mostrarEcuacion");
 
       let xVals = [], yVals = [];
       let ymin = Infinity, ymax = -Infinity;
 
       for (let x = -20; x <= 20; x += 0.5) {
-        let y = tipo === "lineal" ? a * x + b : a * x * x + b * x + c;
+        let y = tipo === "lineal" ? b * x + c : a * x * x + b * x + c;
         xVals.push(x);
         yVals.push(y);
         if (y < ymin) ymin = y;
@@ -66,18 +95,15 @@
       }
 
       // Mostrar ecuación
-      let eqText = tipo === "lineal"
-        ? `f(x) = ${a}x ${b >= 0 ? "+" : "-"} ${Math.abs(b)}`
-        : `f(x) = ${a}x² ${b >= 0 ? "+" : "-"} ${Math.abs(b)}x ${c >= 0 ? "+" : "-"} ${Math.abs(c)}`;
-      ecuacion.textContent = `Ecuación: ${eqText}`;
+      mostrarEcuacion.textContent = `Ecuación interpretada: f(x) = ${a}x² + ${b}x + ${c}`;
 
-      // Mostrar soluciones
+      // Calcular soluciones
       if (tipo === "lineal") {
-        if (a !== 0) {
-          const x = -b / a;
+        if (b !== 0) {
+          const x = -c / b;
           resultado.textContent = `Raíz: x = ${x.toFixed(2)}`;
         } else {
-          resultado.textContent = b === 0 ? "Infinitas soluciones" : "Sin solución";
+          resultado.textContent = c === 0 ? "Infinitas soluciones" : "Sin solución";
         }
       } else {
         const d = b * b - 4 * a * c;
@@ -93,22 +119,20 @@
         }
       }
 
-      // Mostrar dominio y rango
-      dominio.textContent = `Dominio: [-20, 20]`;
+      dominio.textContent = "Dominio: [-20, 20]";
       rango.textContent = `Rango aproximado: [${ymin.toFixed(2)}, ${ymax.toFixed(2)}]`;
 
-      // Graficar
+      // Gráfico
       const ctx = document.getElementById("grafica").getContext("2d");
       if (chart) chart.destroy();
       chart = new Chart(ctx, {
-        type: "line",
+        type: 'line',
         data: {
           labels: xVals,
           datasets: [{
             label: 'f(x)',
             data: yVals,
-            borderColor: "blue",
-            borderWidth: 2,
+            borderColor: 'blue',
             fill: false,
             pointRadius: 0
           }]
@@ -120,13 +144,13 @@
               type: 'linear',
               min: -20,
               max: 20,
-              title: { display: true, text: "x" },
+              title: { display: true, text: 'x' },
               ticks: { stepSize: 5 }
             },
             y: {
               min: -20,
               max: 20,
-              title: { display: true, text: "f(x)" },
+              title: { display: true, text: 'f(x)' },
               ticks: { stepSize: 5 }
             }
           },
