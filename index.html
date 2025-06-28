@@ -81,7 +81,7 @@
         const compiled = math.compile(input);
         let exclusiones = [];
 
-        // Analizar denominadores para el dominio
+        // Detectar restricciones del dominio
         expr.traverse(function (node) {
           if (node.type === "OperatorNode" && node.op === "/") {
             const denom = node.args[1].toString();
@@ -97,7 +97,7 @@
           domStr = `x ∈ ℝ, x ≠ ${exclusiones.map(e => `raíz de (${e} = 0)`).join(", ")}`;
         }
 
-        // Despejar x en función de y (si es posible)
+        // Intentar despejar x a partir de y = f(x)
         const eqExpr = math.parse(`y - (${input})`);
         procedimiento += `Ecuación: y = ${input}\n`;
 
@@ -115,7 +115,7 @@
           procedimiento += "No se pudo despejar x simbólicamente.";
         }
 
-        // Tabla y gráfica
+        // Calcular tabla y extremos para rango estimado
         for (let x of xVals) {
           let scope = { x };
           let yVal = compiled.evaluate(scope);
@@ -128,7 +128,7 @@
           tablaHTML += `<tr><td>${x}</td><td>${yVal}</td></tr>`;
         }
 
-        // Mostrar todo
+        // Mostrar resultados
         document.getElementById("dom").textContent = `D = { ${domStr} }`;
         document.getElementById("proc").textContent = procedimiento;
         document.getElementById("ran").textContent = `R ≈ { y ∈ ℝ | ${minY} ≤ y ≤ ${maxY} }`;
@@ -141,7 +141,7 @@
           mode: "lines+markers",
           type: "scatter",
           line: { color: "turquoise" },
-          marker: { color: "peach", size: 8 }
+          marker: { color: "#FFDAB9", size: 8 }  // peach puff
         };
 
         Plotly.newPlot("graph", [trace], {
