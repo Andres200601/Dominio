@@ -130,27 +130,26 @@ function analizar() {
     let excluidos = [];
 
     for (let exp of dominioExclusiones) {
-      console.log("Dominio excluido (raw):", exp); // Debug: muestra expresión original
       try {
-        // Limpiar paréntesis exteriores
         let limpio = limpiarParentesis(exp);
-        console.log("Dominio excluido (limpio):", limpio); // Debug: muestra expresión limpia
 
-        // Simplificar expresión limpia
         const simplifiedNode = math.simplify(limpio);
         const simplifiedStr = simplifiedNode.toString();
 
-        // Crear ecuación simplifiedStr = 0
         const eqNode = math.parse(`${simplifiedStr} = 0`);
         const soluciones = math.solve(eqNode, 'x');
 
-        soluciones.forEach(sol => {
-          const solStr = sol.toString();
-          excluidos.push(solStr);
-          asintotasV.push(solStr);
-        });
+        if (soluciones.length > 0) {
+          soluciones.forEach(sol => {
+            const solLimpio = sol.toString().replace(/[()]/g, '').trim();
+            excluidos.push(solLimpio);
+            asintotasV.push(solLimpio);
+          });
+        } else {
+          excluidos.push(limpiarParentesis(exp));
+        }
       } catch (error) {
-        excluidos.push(`(${exp}) = 0`);
+        excluidos.push(limpiarParentesis(exp));
       }
     }
 
