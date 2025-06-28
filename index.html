@@ -105,21 +105,25 @@ function analizar() {
     });
 
     let domStr = "x ∈ ℝ";
-    let excluidos = [];
-    for (let exp of dominioExclusiones) {
-      try {
-        const nodo = math.parse(`${exp} = 0`);
-        const solucion = math.solve(nodo, 'x');
-        if (solucion.length > 0) {
-          excluidos.push(...solucion.map(s => s.toString()));
-          asintotasV.push(...solucion.map(s => Number(s)));
-        } else {
-          excluidos.push(`(${exp}) = 0`);
-        }
-      } catch {
-        excluidos.push(`(${exp}) = 0`);
-      }
-    }
+let excluidos = [];
+for (let exp of dominioExclusiones) {
+  try {
+    const soluciones = math.solve(math.parse(`${exp} = 0`), 'x');
+    soluciones.forEach(sol => {
+      const val = math.evaluate(sol.toString());
+      excluidos.push(val.toString());
+      asintotasV.push(val);
+    });
+  } catch {
+    excluidos.push(`(${exp}) = 0`);
+  }
+}
+
+if (excluidos.length === 1) {
+  domStr = `x ∈ ℝ, x ≠ ${excluidos[0]}`;
+} else if (excluidos.length > 1) {
+  domStr = `x ∈ ℝ, x ≠ ${excluidos.join(" o x ≠ ")}`;
+}
     if (excluidos.length === 1) {
       domStr = `x ∈ ℝ, x ≠ ${excluidos[0]}`;
     } else if (excluidos.length > 1) {
