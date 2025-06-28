@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Calculadora de Ecuaciones</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
@@ -109,12 +109,16 @@ function analizar() {
     let excluidos = [];
     for (let exp of dominioExclusiones) {
       try {
-        const soluciones = math.solve(math.parse(`${exp} = 0`), 'x');
+        const simplified = math.simplify(exp);
+        const node = math.parse(`${simplified} = 0`);
+        const soluciones = math.solve(node, 'x');
+
         soluciones.forEach(sol => {
           const val = math.evaluate(sol.toString());
           excluidos.push(val.toString());
           asintotasV.push(val);
         });
+
       } catch {
         excluidos.push(`(${exp}) = 0`);
       }
@@ -187,7 +191,7 @@ function analizar() {
 
     document.getElementById("tabla").innerHTML = tablaHTML;
 
-    // Graficar
+    // Gráfica
     const trace = {
       x: xVals,
       y: yVals,
