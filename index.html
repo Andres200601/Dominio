@@ -73,9 +73,22 @@
   <div id="graph"></div>
 
 <script>
-// Función para limpiar paréntesis exteriores innecesarios
+function balanceParentesis(s) {
+  let count = 0;
+  for (let c of s) {
+    if (c === '(') count++;
+    else if (c === ')') count--;
+    if (count < 0) return false;
+  }
+  return count === 0;
+}
+
 function limpiarParentesis(str) {
-  while (str.startsWith('(') && str.endsWith(')')) {
+  while (
+    str.startsWith('(') && 
+    str.endsWith(')') && 
+    balanceParentesis(str.substring(1, str.length - 1))
+  ) {
     str = str.substring(1, str.length - 1).trim();
   }
   return str;
@@ -117,9 +130,11 @@ function analizar() {
     let excluidos = [];
 
     for (let exp of dominioExclusiones) {
+      console.log("Dominio excluido (raw):", exp); // Debug: muestra expresión original
       try {
         // Limpiar paréntesis exteriores
         let limpio = limpiarParentesis(exp);
+        console.log("Dominio excluido (limpio):", limpio); // Debug: muestra expresión limpia
 
         // Simplificar expresión limpia
         const simplifiedNode = math.simplify(limpio);
