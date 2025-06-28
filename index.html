@@ -85,8 +85,8 @@ function balanceParentesis(s) {
 
 function limpiarParentesis(str) {
   while (
-    str.startsWith('(') && 
-    str.endsWith(')') && 
+    str.startsWith('(') &&
+    str.endsWith(')') &&
     balanceParentesis(str.substring(1, str.length - 1))
   ) {
     str = str.substring(1, str.length - 1).trim();
@@ -115,7 +115,7 @@ function analizar() {
     const expr = math.parse(input);
     const compiled = math.compile(input);
 
-    // Detectar denominadores para dominio
+    // Detectar denominadores para el dominio
     expr.traverse(node => {
       if (node.type === "OperatorNode" && node.op === "/") {
         const denom = node.args[1].toString();
@@ -125,7 +125,7 @@ function analizar() {
       }
     });
 
-    // Resolver exclusiones de dominio (limpiando paréntesis)
+    // Resolver exclusiones de dominio
     let domStr = "x ∈ ℝ";
     let excluidos = [];
 
@@ -134,26 +134,28 @@ function analizar() {
         let limpio = limpiarParentesis(exp);
         const simplifiedNode = math.simplify(limpio);
         const simplifiedStr = simplifiedNode.toString();
+
         const soluciones = math.evaluate(`solve(${simplifiedStr} = 0, x)`);
 
-        if (soluciones.length > 0) {
+        if (soluciones && soluciones.length > 0) {
           soluciones.forEach(sol => {
             const solLimpio = sol.toString().replace(/[()]/g, '').trim();
             excluidos.push(solLimpio);
             asintotasV.push(solLimpio);
           });
         } else {
-          excluidos.push(simplifiedStr);
+          excluidos.push(limpiarParentesis(exp));
         }
       } catch (error) {
         excluidos.push(limpiarParentesis(exp));
       }
     }
 
+    // Mostrar dominio corregido
     if (excluidos.length === 1) {
       domStr = `x ∈ ℝ, x ≠ ${excluidos[0]}`;
     } else if (excluidos.length > 1) {
-      domStr = `x ∈ ℝ, x ≠ ${excluidos.join(" o x ≠ ")}`;
+      domStr = `x ∈ ℝ, x ≠ ` + excluidos.map(x => `${x}`).join(" y x ≠ ");
     }
 
     // Procedimiento para rango
@@ -178,7 +180,7 @@ function analizar() {
       }
     } catch {}
 
-    // Evaluar tabla de valores
+    // Evaluar tabla
     for (let x of xVals) {
       try {
         let y = compiled.evaluate({ x });
@@ -194,7 +196,7 @@ function analizar() {
       }
     }
 
-    // Asíntota horizontal aproximada
+    // Asíntota horizontal
     try {
       const limPos = compiled.evaluate({ x: 1e6 });
       const limNeg = compiled.evaluate({ x: -1e6 });
