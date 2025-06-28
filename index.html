@@ -6,12 +6,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; color: #222; }
-    input, button { padding: 10px; width: 100%; font-size: 16px; margin-bottom: 10px; }
-    code { background: #eaeaea; padding: 3px 6px; border-radius: 4px; }
-    table { width: 100%; max-width: 400px; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #999; padding: 6px; text-align: center; }
-    pre { background: #f9f9f9; padding: 10px; overflow-x: auto; white-space: pre-wrap; }
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f0f0f0; }
+    input, button { padding: 10px; font-size: 16px; width: 100%; margin-bottom: 10px; }
+    code { background: #e0e0e0; padding: 4px 6px; border-radius: 4px; }
+    table { border-collapse: collapse; width: 100%; max-width: 400px; margin-top: 10px; }
+    th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
     #graph { margin-top: 20px; }
   </style>
 </head>
@@ -26,8 +25,13 @@
 <p><strong>Rango:</strong> <code id="rango"></code></p>
 <p><strong>Asíntotas Verticales:</strong> <code id="asintotasV"></code></p>
 <p><strong>Asíntotas Horizontales:</strong> <code id="asintotasH"></code></p>
+
 <h3>Tabla de valores</h3>
-<table><thead><tr><th>x</th><th>f(x)</th></tr></thead><tbody id="tabla"></tbody></table>
+<table>
+  <thead><tr><th>x</th><th>f(x)</th></tr></thead>
+  <tbody id="tabla"></tbody>
+</table>
+
 <div id="graph"></div>
 
 <script>
@@ -35,37 +39,39 @@ function analizarFuncion() {
   const input = document.getElementById("inputFunc").value.trim();
   const expr = math.parse(input);
   const compiled = math.compile(input);
+  const puntosX = [-10, -5, -3, -2.1, -1, 0, 1, 2, 3, 5];
+  const puntosY = [];
+  let tablaHTML = "";
   let dominioStr = "D = { x ∈ ℝ";
   let rangoStr = "";
-  let tablaHTML = "";
   let asintotasV = [];
   let excluidos = [];
   let minY = Infinity, maxY = -Infinity;
-  let puntosX = [-10, -8, -5, -3, -2.1, -1, 0, 1, 3, 5]; // 10 puntos
-  let puntosY = [];
 
-  // Detectar valores excluidos del dominio (divisiones por 0)
+  // Detectar denominadores cero
   expr.traverse(node => {
     if (node.type === "OperatorNode" && node.op === "/") {
       try {
-        let denom = node.args[1];
-        let eq = math.simplify(denom).toString();
-        let soluciones = math.evaluate(`solve(${eq} = 0, x)`);
-        soluciones = Array.isArray(soluciones) ? soluciones : [soluciones];
-        soluciones.forEach(s => {
-          excluidos.push(s.toString());
-          asintotasV.push(`x = ${s.toString()}`);
+        const denom = node.args[1];
+        const eq = math.simplify(denom).toString();
+        const soluciones = math.evaluate(`solve(${eq} = 0, x)`);
+        const valores = Array.isArray(soluciones) ? soluciones : [soluciones];
+        valores.forEach(val => {
+          if (!excluidos.includes(val.toString())) {
+            excluidos.push(val.toString());
+            asintotasV.push(`x = ${val}`);
+          }
         });
       } catch {}
     }
   });
 
-  if (excluidos.length > 0) {
+  if (excluidos.length) {
     dominioStr += ", x ≠ " + excluidos.join(" y x ≠ ");
   }
   dominioStr += " }";
 
-  // Tabla de valores
+  // Calcular valores para la tabla
   puntosX.forEach(x => {
     let y;
     try {
@@ -84,19 +90,19 @@ function analizarFuncion() {
     }
   });
 
-  // Asíntota horizontal (límite en ±∞)
+  // Detectar asíntota horizontal
   let ah = null;
   try {
     const limPos = compiled.evaluate({ x: 1e6 });
     const limNeg = compiled.evaluate({ x: -1e6 });
     if (Math.abs(limPos - limNeg) < 1e-2) {
-      let limite = math.round((limPos + limNeg) / 2, 5);
-      ah = `y = ${limite}`;
+      ah = `y = ${math.round((limPos + limNeg) / 2, 5)}`;
     }
   } catch {}
 
-  // Rango simbólico para funciones racionales tipo 1/(x + a)
-  if (/^1\s*\/\s*\(x\s*[+\-]\s*\d+\)$/.test(input.replace(/\s+/g, ""))) {
+  // Detectar rango especial si es racional simple
+  const formateado = input.replace(/\s+/g, "");
+  if (/^1\/\(x[+\-]\d+\)$/.test(formateado)) {
     rangoStr = "R = { y | y ∈ ℝ, y ≠ 0 }";
   } else {
     rangoStr = `R ≈ { y ∈ ℝ | ${math.round(minY, 5)} ≤ y ≤ ${math.round(maxY, 5)} }`;
@@ -109,36 +115,42 @@ function analizarFuncion() {
   document.getElementById("asintotasH").textContent = ah || "Ninguna";
   document.getElementById("tabla").innerHTML = tablaHTML;
 
-  // Gráfica
+  // Gráfica con asíntotas
   let layout = {
     title: "Gráfica de la función",
     xaxis: { title: "x" },
     yaxis: { title: "f(x)" },
     shapes: []
   };
+
+  // Asíntota horizontal
   if (ah) {
     const yVal = parseFloat(ah.split("=")[1]);
     layout.shapes.push({
-      type: "line", x0: -10, x1: 10, y0: yVal, y1: yVal,
+      type: "line",
+      x0: -10, x1: 10,
+      y0: yVal, y1: yVal,
       line: { color: "blue", dash: "dashdot" }
     });
   }
-  excluidos.forEach(x => {
-    const xVal = parseFloat(x);
-    if (!isNaN(xVal)) {
-      layout.shapes.push({
-        type: "line", x0: xVal, x1: xVal, y0: minY, y1: maxY,
-        line: { color: "red", dash: "dot" }
-      });
-    }
+
+  // Asíntotas verticales
+  excluidos.forEach(xStr => {
+    const xVal = parseFloat(xStr);
+    layout.shapes.push({
+      type: "line",
+      x0: xVal, x1: xVal,
+      y0: minY, y1: maxY,
+      line: { color: "red", dash: "dot" }
+    });
   });
 
   Plotly.newPlot("graph", [{
     x: puntosX,
     y: puntosY,
     mode: "lines+markers",
-    marker: { color: "orange" },
-    line: { color: "green" }
+    line: { color: "green" },
+    marker: { color: "orange" }
   }], layout);
 }
 </script>
