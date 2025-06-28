@@ -73,6 +73,14 @@
   <div id="graph"></div>
 
 <script>
+// Función para limpiar paréntesis exteriores innecesarios
+function limpiarParentesis(str) {
+  while (str.startsWith('(') && str.endsWith(')')) {
+    str = str.substring(1, str.length - 1).trim();
+  }
+  return str;
+}
+
 function analizar() {
   const input = document.getElementById("eq").value.trim();
   if (!input) {
@@ -104,29 +112,29 @@ function analizar() {
       }
     });
 
-    // Resolver exclusiones de dominio (corregido para evitar paréntesis extra)
+    // Resolver exclusiones de dominio (limpiando paréntesis)
     let domStr = "x ∈ ℝ";
     let excluidos = [];
 
     for (let exp of dominioExclusiones) {
       try {
-        // Simplificamos la expresión para eliminar paréntesis extra
-        const simplifiedNode = math.simplify(exp);
+        // Limpiar paréntesis exteriores
+        let limpio = limpiarParentesis(exp);
+
+        // Simplificar expresión limpia
+        const simplifiedNode = math.simplify(limpio);
         const simplifiedStr = simplifiedNode.toString();
 
-        // Creamos la ecuación simplifiedStr = 0
+        // Crear ecuación simplifiedStr = 0
         const eqNode = math.parse(`${simplifiedStr} = 0`);
         const soluciones = math.solve(eqNode, 'x');
 
         soluciones.forEach(sol => {
-          // Convertimos solución a string sin evaluar para que salga limpia
           const solStr = sol.toString();
-
           excluidos.push(solStr);
           asintotasV.push(solStr);
         });
       } catch (error) {
-        // Si no puede resolver, mostrar la condición original
         excluidos.push(`(${exp}) = 0`);
       }
     }
