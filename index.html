@@ -80,138 +80,159 @@ function analizar() {
     return;
   }
 
-  let expr, compiled;
-  try {
-    expr = math.parse(input);
-    compiled = math.compile(input);
-  } catch (error) {
-    alert("Error al analizar la expresión: " + error.message);
-    return;
-  }
-
+  let dominioExclusiones = [];
+  let procedimiento = "";
+  let asintotasV = [];
+  let asintotaH = null;
   const xVals = [-10, -5, -3, -2, -1, 0, 1, 2, 3, 5, 10];
   const yVals = [];
   let tablaHTML = "";
-  let procedimiento = "";
   let minY = Infinity, maxY = -Infinity;
-  let asintotasV = [];
-  let dominioExcluido = [];
+  let rangoExcepcion = false;
 
-  // Buscar denominadores
-  expr.traverse(node => {
-    if (node.type === "OperatorNode" && node.op === "/") {
-      try {
-        const denominador = node.args[1];
-        const simplified = math.simplify(denominador).toString();
-        const soluciones = math.evaluate(`solve(${simplified} = 0, x)`);
-        const valores = Array.isArray(soluciones) ? soluciones : [soluciones];
-        valores.forEach(v => {
-          const num = math.round(v, 5);
-          if (!dominioExcluido.includes(num)) {
-            dominioExcluido.push(num);
-            asintotasV.push(`x = ${num}`);
-          }
-        });
-      } catch {}
-    }
-  });
-
-  // Armar el dominio
-  let domStr = "x ∈ ℝ";
-  if (dominioExcluido.length === 1) {
-    domStr += `, x ≠ ${dominioExcluido[0]}`;
-  } else if (dominioExcluido.length > 1) {
-    domStr += dominioExcluido.map(x => `, x ≠ ${x}`).join("");
-  }
-
-  // Evaluar tabla de valores
-  for (let x of xVals) {
-    try {
-      const y = compiled.evaluate({ x });
-      if (!isNaN(y) && Math.abs(y) < 1e6) {
-        const rounded = math.round(y, 5);
-        yVals.push(rounded);
-        minY = Math.min(minY, rounded);
-        maxY = Math.max(maxY, rounded);
-        tablaHTML += `<tr><td>${x}</td><td>${rounded}</td></tr>`;
-      } else {
-        tablaHTML += `<tr><td>${x}</td><td>undefined</td></tr>`;
-      }
-    } catch {
-      tablaHTML += `<tr><td>${x}</td><td>undefined</td></tr>`;
-    }
-  }
-
-  // Rango aproximado
-  let rangoStr = `R ≈ { y ∈ ℝ | ${math.round(minY, 5)} ≤ y ≤ ${math.round(maxY, 5)} }`;
-
-  // Asíntota horizontal
-  let asH = "No se detectó";
   try {
-    const limPos = compiled.evaluate({ x: 1e6 });
-    const limNeg = compiled.evaluate({ x: -1e6 });
-    if (Math.abs(limPos - limNeg) < 1e-2) {
-      const limite = math.round((limPos + limNeg) / 2, 5);
-      asH = `y = ${limite}`;
+    const expr = math.parse(input);
+    const compiled = math.compile(input);
+
+    // Buscar ceros en el denominador escaneando los OperatorNode de división
+    expr.traverse(function (node) {
+      if (node.type === "OperatorNode" && node.op === "/") {
+        const denominador = node.args[1];
+        try {
+          const f = math.compile(denominador.toString());
+          for (let x = -20; x <= 20; x += 0.1) {
+            try {
+              const val = f.evaluate({ x });
+              if (Math.abs(val) < 1e-6) {
+                const rounded = Math.round(x * 1000) / 1000;
+                if (!dominioExclusiones.includes(rounded.toString())) {
+                  dominioExclusiones.push(rounded.toString());
+                  asintotasV.push(rounded.toString());
+                }
+              }
+            } catch {}
+          }
+        } catch {}
+      }
+    });
+
+    // Construir texto del dominio
+    let domStr = "x ∈ ℝ";
+    if (dominioExclusiones.length === 1) {
+      domStr = `x ∈ ℝ, x ≠ ${dominioExclusiones[0]}`;
+    } else if (dominioExclusiones.length > 1) {
+      domStr = `x ∈ ℝ, x ≠ ${dominioExclusiones.join(" o x ≠ ")}`;
     }
-  } catch {}
 
-  // Procedimiento extra para funciones tipo 1/(x ± a)
-  const inputSinEspacios = input.replace(/\s+/g, "");
-  if (/^1\/\(x[+-]\d+\)$/.test(inputSinEspacios)) {
-    procedimiento = `Función tipo 1 / (x ± a). El rango será todo ℝ excepto 0 porque nunca toma ese valor.`;
-    rangoStr = "R = { y | y ∈ ℝ, y ≠ 0 }";
-  }
+    // Procedimiento para rango (si la función es del tipo 1 / (x ± a))
+    procedimiento += `Ecuación original: y = ${input}\n`;
 
-  // Mostrar resultados
-  document.getElementById("dom").textContent = `D = { ${domStr} }`;
-  document.getElementById("ran").textContent = rangoStr;
-  document.getElementById("asv").textContent = asintotasV.length ? asintotasV.join(", ") : "Ninguna";
-  document.getElementById("ash").textContent = asH;
-  document.getElementById("proc").textContent = procedimiento || "Rango estimado con tabla de valores.";
-  document.getElementById("tabla").innerHTML = tablaHTML;
+    try {
+      const parsed = math.parse(input);
+      if (parsed.type === "OperatorNode" && parsed.op === "/") {
+        const numer = parsed.args[0].toString();
+        let denom = parsed.args[1].toString().replace(/^\(|\)$/g, "").trim();
+        const match = denom.match(/^x\s*([\+\-])\s*(\d+)$/);
+        if (numer === "1" && match) {
+          const signo = match[1], num = match[2];
+          procedimiento +=
+            `\nProcedimiento especial para despeje:\n` +
+            `y = 1/(x ${signo} ${num})\n` +
+            `⇒ y(x ${signo} ${num}) = 1\n` +
+            `⇒ xy ${signo} ${num}y = 1\n` +
+            `⇒ x = (1 ${signo === "+" ? "-" : "+"} ${num}y) / y\n`;
+          rangoExcepcion = true;
+        }
+      }
+    } catch {}
 
-  // Graficar
-  const trace = {
-    x: xVals,
-    y: yVals,
-    mode: "lines+markers",
-    type: "scatter",
-    line: { color: "green" },
-    marker: { color: "yellow", size: 8 }
-  };
+    // Evaluar tabla de valores
+    for (let x of xVals) {
+      try {
+        let y = compiled.evaluate({ x });
+        y = math.round(y, 5);
+        yVals.push(y);
+        if (!isNaN(y)) {
+          minY = Math.min(minY, y);
+          maxY = Math.max(maxY, y);
+        }
+        tablaHTML += `<tr><td>${x}</td><td>${y}</td></tr>`;
+      } catch {
+        tablaHTML += `<tr><td>${x}</td><td>NaN</td></tr>`;
+      }
+    }
 
-  const layout = {
-    title: "Gráfica de la función",
-    xaxis: { title: "x" },
-    yaxis: { title: "f(x)" },
-    shapes: []
-  };
+    // Asíntota horizontal aproximada
+    try {
+      const limPos = compiled.evaluate({ x: 1e6 });
+      const limNeg = compiled.evaluate({ x: -1e6 });
+      if (Math.abs(limPos - limNeg) < 0.1) {
+        asintotaH = math.round((limPos + limNeg) / 2, 5);
+      }
+    } catch {}
 
-  dominioExcluido.forEach(x => {
-    layout.shapes.push({
-      type: "line",
-      x0: x,
-      x1: x,
-      y0: minY,
-      y1: maxY,
-      line: { color: "red", dash: "dot" }
+    // Mostrar resultados
+    document.getElementById("dom").textContent = `D = { ${domStr} }`;
+    document.getElementById("proc").textContent = procedimiento;
+    document.getElementById("ran").textContent = rangoExcepcion
+      ? `R = { y | y ∈ ℝ, y ≠ 0 }`
+      : `R ≈ { y ∈ ℝ | ${minY} ≤ y ≤ ${maxY} }`;
+    document.getElementById("asv").textContent =
+      asintotasV.length > 0 ? asintotasV.map(x => `x = ${x}`).join(", ") : "Ninguna";
+    document.getElementById("ash").textContent =
+      asintotaH !== null ? `y = ${asintotaH}` : "No se detectó";
+
+    document.getElementById("tabla").innerHTML = tablaHTML;
+
+    // Graficar
+    const trace = {
+      x: xVals,
+      y: yVals,
+      mode: "lines+markers",
+      type: "scatter",
+      line: { color: "green" },
+      marker: { color: "yellow", size: 8 }
+    };
+
+    const layout = {
+      title: "Gráfica de la función",
+      xaxis: { title: "x" },
+      yaxis: { title: "f(x)" },
+      shapes: []
+    };
+
+    // Asíntotas verticales
+    asintotasV.forEach(x => {
+      const xNum = Number(x);
+      if (!isNaN(xNum)) {
+        layout.shapes.push({
+          type: "line",
+          x0: xNum,
+          x1: xNum,
+          y0: minY,
+          y1: maxY,
+          line: { dash: "dot", color: "red" }
+        });
+      }
     });
-  });
 
-  if (asH.startsWith("y =")) {
-    const yVal = parseFloat(asH.split("=")[1]);
-    layout.shapes.push({
-      type: "line",
-      x0: Math.min(...xVals),
-      x1: Math.max(...xVals),
-      y0: yVal,
-      y1: yVal,
-      line: { color: "blue", dash: "dot" }
-    });
+    // Asíntota horizontal
+    if (asintotaH !== null) {
+      layout.shapes.push({
+        type: "line",
+        x0: Math.min(...xVals),
+        x1: Math.max(...xVals),
+        y0: asintotaH,
+        y1: asintotaH,
+        line: { dash: "dot", color: "blue" }
+      });
+    }
+
+    Plotly.newPlot("graph", [trace], layout);
+
+  } catch (error) {
+    alert("Error: " + error.message);
   }
-
-  Plotly.newPlot("graph", [trace], layout);
 }
 </script>
 
