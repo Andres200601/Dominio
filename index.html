@@ -2,34 +2,40 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Calculadora de Ecuaciones con Gráfica</title>
+  <title>Analizador de Ecuaciones</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 30px;
-      background-color: #f8f9fa;
-    }
-    h1 {
-      color: #2c3e50;
+      background: #f4f4f4;
+      color: #222;
     }
     input, button {
-      font-size: 1em;
-      padding: 10px;
       width: 100%;
+      padding: 12px;
       margin: 10px 0;
+      font-size: 1em;
+    }
+    code {
+      background: #e8e8e8;
+      padding: 3px 6px;
+      border-radius: 4px;
     }
     table {
       border-collapse: collapse;
-      margin-top: 20px;
+      margin-top: 10px;
     }
-    td, th {
-      padding: 8px 12px;
-      border: 1px solid #ccc;
+    th, td {
+      border: 1px solid #bbb;
+      padding: 6px 12px;
+      text-align: center;
     }
-    #output {
-      margin-top: 20px;
+    pre {
+      background: #f0f0f0;
+      padding: 10px;
+      overflow-x: auto;
     }
     #graph {
       margin-top: 30px;
@@ -38,52 +44,93 @@
 </head>
 <body>
 
-  <h1>Calculadora de Ecuaciones</h1>
+  <h1>Calculadora de Ecuaciones con Dominio y Rango</h1>
 
-  <label for="equation">Ingresa la ecuación en función de x (ej: x^2 - 4):</label>
-  <input type="text" id="equation" placeholder="Ejemplo: sin(x) + x^2">
+  <label for="eq">Ingresa la ecuación (ej: 1 / (x + 2)):</label>
+  <input type="text" id="eq" placeholder="Ejemplo: sin(x) / (x + 1)">
+  <button onclick="analizar()">Calcular</button>
 
-  <button onclick="procesarEcuacion()">Calcular</button>
+  <h2>Resultados:</h2>
+  <p><strong>Dominio:</strong> <code id="dom"></code></p>
+  <p><strong>Procedimiento para Rango:</strong></p>
+  <pre id="proc"></pre>
+  <p><strong>Rango estimado:</strong> <code id="ran"></code></p>
 
-  <div id="output">
-    <p><strong>Dominio:</strong> <span id="dominio">-</span></p>
-    <p><strong>Rango (estimado):</strong> <span id="rango">-</span></p>
-    <h3>Tabla de valores:</h3>
-    <table id="tabla">
-      <thead>
-        <tr><th>x</th><th>f(x)</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
+  <h3>Tabla de valores (x, f(x))</h3>
+  <table>
+    <thead><tr><th>x</th><th>f(x)</th></tr></thead>
+    <tbody id="tabla"></tbody>
+  </table>
 
   <div id="graph"></div>
 
   <script>
-    function procesarEcuacion() {
-      const eqStr = document.getElementById("equation").value;
-      const expr = math.compile(eqStr);
+    function analizar() {
+      const input = document.getElementById("eq").value;
+      let domStr = "x ∈ ℝ";
+      let rango = "y ∈ ℝ";
+      let procedimiento = "";
+
       const xVals = [-3, -2, -1, 0, 1, 2, 3];
       const yVals = [];
-      let minY = Infinity, maxY = -Infinity;
       let tablaHTML = "";
+      let minY = Infinity, maxY = -Infinity;
 
       try {
-        for (let x of xVals) {
-          let scope = { x };
-          let y = expr.evaluate(scope);
-          y = math.round(y, 5); // limitar decimales
-          yVals.push(y);
-          if (!isNaN(y)) {
-            minY = Math.min(minY, y);
-            maxY = Math.max(maxY, y);
+        const expr = math.parse(input);
+        const compiled = math.compile(input);
+        let exclusiones = [];
+
+        // Analizar denominadores para el dominio
+        expr.traverse(function (node) {
+          if (node.type === "OperatorNode" && node.op === "/") {
+            const denom = node.args[1].toString();
+            exclusiones.push(denom);
           }
-          tablaHTML += `<tr><td>${x}</td><td>${y}</td></tr>`;
+          if (node.type === "FunctionNode" && node.fn.name === "sqrt") {
+            const inside = node.args[0].toString();
+            procedimiento += `Restricción: sqrt(${inside}) ⇒ ${inside} ≥ 0\n`;
+          }
+        });
+
+        if (exclusiones.length > 0) {
+          domStr = `x ∈ ℝ, x ≠ ${exclusiones.map(e => `raíz de (${e} = 0)`).join(", ")}`;
         }
 
-        document.getElementById("tabla").querySelector("tbody").innerHTML = tablaHTML;
-        document.getElementById("dominio").textContent = "ℝ (Todos los reales)";
-        document.getElementById("rango").textContent = `[${minY}, ${maxY}]`;
+        // Despejar x en función de y (si es posible)
+        const y = math.parse("y");
+        const fx = math.parse(input);
+        const eq = new math.EqualNode(y, fx);
+        procedimiento += `Ecuación: y = ${input}\n`;
+
+        try {
+          const solved = math.simplify(math.algebra.solve(eq, 'x')[0].toString());
+          procedimiento += `Despejando x:\n⇒ x = ${solved}\n`;
+          if (solved.toString().includes("/y")) {
+            rango = "y ∈ ℝ, y ≠ 0";
+          }
+        } catch (e) {
+          procedimiento += "No se pudo despejar x simbólicamente.";
+        }
+
+        // Tabla y gráfica
+        for (let x of xVals) {
+          let scope = { x };
+          let yVal = compiled.evaluate(scope);
+          yVal = math.round(yVal, 5);
+          yVals.push(yVal);
+          if (!isNaN(yVal)) {
+            minY = Math.min(minY, yVal);
+            maxY = Math.max(maxY, yVal);
+          }
+          tablaHTML += `<tr><td>${x}</td><td>${yVal}</td></tr>`;
+        }
+
+        // Mostrar todo
+        document.getElementById("dom").textContent = `D = { ${domStr} }`;
+        document.getElementById("proc").textContent = procedimiento;
+        document.getElementById("ran").textContent = `R ≈ { y ∈ ℝ | ${minY} ≤ y ≤ ${maxY} }`;
+        document.getElementById("tabla").innerHTML = tablaHTML;
 
         // Gráfica
         const trace = {
@@ -91,8 +138,8 @@
           y: yVals,
           mode: "lines+markers",
           type: "scatter",
-          line: { color: "green" },
-          marker: { color: "yellow", size: 8 }
+          line: { color: "pale blue" },
+          marker: { color: "light red", size: 8 }
         };
 
         Plotly.newPlot("graph", [trace], {
@@ -103,11 +150,7 @@
         });
 
       } catch (err) {
-        alert("Error en la ecuación: " + err.message);
-        document.getElementById("tabla").querySelector("tbody").innerHTML = "";
-        document.getElementById("graph").innerHTML = "";
-        document.getElementById("dominio").textContent = "-";
-        document.getElementById("rango").textContent = "-";
+        alert("Error: " + err.message);
       }
     }
   </script>
