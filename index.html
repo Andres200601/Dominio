@@ -1,100 +1,122 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Calculadora de Ecuaciones</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 20px;
-      background: #f5f5f5;
+      margin: 30px;
+      background: #f4f4f4;
+      color: #222;
     }
     input, button {
-      padding: 10px;
-      font-size: 1rem;
       width: 100%;
-      margin: 5px 0;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 1em;
     }
     code {
-      background: #eaeaea;
-      padding: 2px 5px;
+      background: #e8e8e8;
+      padding: 3px 6px;
       border-radius: 4px;
     }
     table {
       border-collapse: collapse;
-      width: 100%;
       margin-top: 10px;
+      width: 100%;
+      max-width: 400px;
     }
     th, td {
-      border: 1px solid #ccc;
-      padding: 6px;
+      border: 1px solid #bbb;
+      padding: 6px 12px;
       text-align: center;
     }
+    pre {
+      background: #f0f0f0;
+      padding: 10px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      max-width: 700px;
+    }
     #graph {
-      margin-top: 20px;
+      margin-top: 30px;
+      max-width: 700px;
     }
   </style>
 </head>
 <body>
 
-<h2>Calculadora de Funciones</h2>
+  <h1>Calculadora de Ecuaciones</h1>
 
-<input id="eq" type="text" placeholder="Ejemplo: 1 / (x + 2)">
-<button onclick="analizar()">Calcular</button>
+  <label for="eq">Ingresa la ecuación (ej: 1 / (x + 2)):</label>
+  <input type="text" id="eq" placeholder="Ejemplo: sin(x) / (x + 1)" />
+  <button onclick="analizar()">Calcular</button>
 
-<p><strong>Dominio:</strong> <code id="dom"></code></p>
-<p><strong>Asíntotas verticales:</strong> <code id="asv"></code></p>
-<p><strong>Asíntotas horizontales:</strong> <code id="ash"></code></p>
-<p><strong>Rango aproximado:</strong> <code id="ran"></code></p>
-<pre id="proc"></pre>
+  <h2>Resultados:</h2>
+  <p><strong>Dominio:</strong> <code id="dom"></code></p>
+  <p><strong>Asíntotas verticales:</strong> <code id="asv"></code></p>
+  <p><strong>Asíntotas horizontales (aproximadas):</strong> <code id="ash"></code></p>
 
-<h3>Tabla de valores</h3>
-<table>
-  <thead><tr><th>x</th><th>f(x)</th></tr></thead>
-  <tbody id="tabla"></tbody>
-</table>
+  <p><strong>Procedimiento para Rango:</strong></p>
+  <pre id="proc"></pre>
+  <p><strong>Rango estimado:</strong> <code id="ran"></code></p>
 
-<div id="graph"></div>
+  <h3>Tabla de valores (x, f(x))</h3>
+  <table>
+    <thead><tr><th>x</th><th>f(x)</th></tr></thead>
+    <tbody id="tabla"></tbody>
+  </table>
+
+  <div id="graph"></div>
 
 <script>
 function analizar() {
-  const input = document.getElementById("eq").value;
-  let expr, compiled;
+  const input = document.getElementById("eq").value.trim();
+  if (!input) {
+    alert("Por favor, ingresa una ecuación válida.");
+    return;
+  }
 
+  let expr, compiled;
   try {
     expr = math.parse(input);
     compiled = math.compile(input);
-  } catch (e) {
-    alert("Error en la expresión");
+  } catch (error) {
+    alert("Error al analizar la expresión: " + error.message);
     return;
   }
 
   const xVals = [-10, -5, -3, -2, -1, 0, 1, 2, 3, 5, 10];
   const yVals = [];
-  let tablaHTML = '';
-  let dominioExcluido = [];
+  let tablaHTML = "";
+  let procedimiento = "";
+  let minY = Infinity, maxY = -Infinity;
   let asintotasV = [];
+  let dominioExcluido = [];
 
+  // Buscar denominadores
   expr.traverse(node => {
     if (node.type === "OperatorNode" && node.op === "/") {
       try {
-        const den = node.args[1];
-        const simplified = math.simplify(den).toString();
-        const solutions = math.evaluate(`solve(${simplified} = 0, x)`);
-        const arr = Array.isArray(solutions) ? solutions : [solutions];
-        arr.forEach(sol => {
-          const val = math.round(sol, 5);
-          if (!dominioExcluido.includes(val)) {
-            dominioExcluido.push(val);
-            asintotasV.push(`x = ${val}`);
+        const denominador = node.args[1];
+        const simplified = math.simplify(denominador).toString();
+        const soluciones = math.evaluate(`solve(${simplified} = 0, x)`);
+        const valores = Array.isArray(soluciones) ? soluciones : [soluciones];
+        valores.forEach(v => {
+          const num = math.round(v, 5);
+          if (!dominioExcluido.includes(num)) {
+            dominioExcluido.push(num);
+            asintotasV.push(`x = ${num}`);
           }
         });
       } catch {}
     }
   });
 
+  // Armar el dominio
   let domStr = "x ∈ ℝ";
   if (dominioExcluido.length === 1) {
     domStr += `, x ≠ ${dominioExcluido[0]}`;
@@ -102,17 +124,16 @@ function analizar() {
     domStr += dominioExcluido.map(x => `, x ≠ ${x}`).join("");
   }
 
-  let minY = Infinity, maxY = -Infinity;
-
+  // Evaluar tabla de valores
   for (let x of xVals) {
     try {
-      const y = compiled.evaluate({x});
-      if (typeof y === "number" && isFinite(y)) {
-        const r = math.round(y, 5);
-        yVals.push(r);
-        tablaHTML += `<tr><td>${x}</td><td>${r}</td></tr>`;
-        minY = Math.min(minY, r);
-        maxY = Math.max(maxY, r);
+      const y = compiled.evaluate({ x });
+      if (!isNaN(y) && Math.abs(y) < 1e6) {
+        const rounded = math.round(y, 5);
+        yVals.push(rounded);
+        minY = Math.min(minY, rounded);
+        maxY = Math.max(maxY, rounded);
+        tablaHTML += `<tr><td>${x}</td><td>${rounded}</td></tr>`;
       } else {
         tablaHTML += `<tr><td>${x}</td><td>undefined</td></tr>`;
       }
@@ -121,68 +142,72 @@ function analizar() {
     }
   }
 
-  // Asíntota horizontal (evaluación a ±infinito)
-  let asH = "No determinada";
+  // Rango aproximado
+  let rangoStr = `R ≈ { y ∈ ℝ | ${math.round(minY, 5)} ≤ y ≤ ${math.round(maxY, 5)} }`;
+
+  // Asíntota horizontal
+  let asH = "No se detectó";
   try {
-    const limPos = compiled.evaluate({x: 1e6});
-    const limNeg = compiled.evaluate({x: -1e6});
+    const limPos = compiled.evaluate({ x: 1e6 });
+    const limNeg = compiled.evaluate({ x: -1e6 });
     if (Math.abs(limPos - limNeg) < 1e-2) {
-      const aprox = math.round((limPos + limNeg)/2, 5);
-      asH = `y = ${aprox}`;
+      const limite = math.round((limPos + limNeg) / 2, 5);
+      asH = `y = ${limite}`;
     }
   } catch {}
 
-  // Rango estimado
-  let proc = "";
-  let rango = `R ≈ [${math.round(minY, 5)}, ${math.round(maxY, 5)}]`;
-
-  if (/^1\/\(x[+-]\d+\)$/.test(input.replace(/\s+/g, ""))) {
-    proc = "Función tipo 1/(x ± a). El valor y = 0 nunca se alcanza.";
-    rango = "R = ℝ, y ≠ 0";
+  // Procedimiento extra para funciones tipo 1/(x ± a)
+  const inputSinEspacios = input.replace(/\s+/g, "");
+  if (/^1\/\(x[+-]\d+\)$/.test(inputSinEspacios)) {
+    procedimiento = `Función tipo 1 / (x ± a). El rango será todo ℝ excepto 0 porque nunca toma ese valor.`;
+    rangoStr = "R = { y | y ∈ ℝ, y ≠ 0 }";
   }
 
-  // Mostrar en HTML
+  // Mostrar resultados
   document.getElementById("dom").textContent = `D = { ${domStr} }`;
-  document.getElementById("asv").textContent = asintotasV.join(", ") || "Ninguna";
+  document.getElementById("ran").textContent = rangoStr;
+  document.getElementById("asv").textContent = asintotasV.length ? asintotasV.join(", ") : "Ninguna";
   document.getElementById("ash").textContent = asH;
-  document.getElementById("ran").textContent = rango;
-  document.getElementById("proc").textContent = proc || "Rango estimado con valores numéricos.";
+  document.getElementById("proc").textContent = procedimiento || "Rango estimado con tabla de valores.";
   document.getElementById("tabla").innerHTML = tablaHTML;
 
-  // Gráfico
+  // Graficar
   const trace = {
     x: xVals,
     y: yVals,
-    type: "scatter",
     mode: "lines+markers",
-    line: {color: "green"},
-    marker: {color: "orange", size: 6}
+    type: "scatter",
+    line: { color: "green" },
+    marker: { color: "yellow", size: 8 }
   };
 
   const layout = {
-    title: "Gráfico de la función",
-    xaxis: {title: "x"},
-    yaxis: {title: "f(x)"},
+    title: "Gráfica de la función",
+    xaxis: { title: "x" },
+    yaxis: { title: "f(x)" },
     shapes: []
   };
 
   dominioExcluido.forEach(x => {
     layout.shapes.push({
       type: "line",
-      x0: x, x1: x,
-      y0: minY, y1: maxY,
-      line: {color: "red", dash: "dot"}
+      x0: x,
+      x1: x,
+      y0: minY,
+      y1: maxY,
+      line: { color: "red", dash: "dot" }
     });
   });
 
-  if (asH.includes("y =")) {
+  if (asH.startsWith("y =")) {
     const yVal = parseFloat(asH.split("=")[1]);
     layout.shapes.push({
       type: "line",
       x0: Math.min(...xVals),
       x1: Math.max(...xVals),
-      y0: yVal, y1: yVal,
-      line: {color: "blue", dash: "dot"}
+      y0: yVal,
+      y1: yVal,
+      line: { color: "blue", dash: "dot" }
     });
   }
 
