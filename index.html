@@ -115,7 +115,6 @@ function analizar() {
     const expr = math.parse(input);
     const compiled = math.compile(input);
 
-    // Detectar denominadores para dominio
     expr.traverse(node => {
       if (node.type === "OperatorNode" && node.op === "/") {
         const denom = node.args[1].toString();
@@ -125,37 +124,39 @@ function analizar() {
       }
     });
 
-    // Resolver exclusiones de dominio (limpiando paréntesis)
     let domStr = "x ∈ ℝ";
     let excluidos = [];
 
     for (let exp of dominioExclusiones) {
       try {
         let limpio = limpiarParentesis(exp);
-        const simplifiedNode = math.simplify(limpio);
-        const simplifiedStr = simplifiedNode.toString();
-        const soluciones = math.evaluate(`solve(${simplifiedStr} = 0, x)`);
+        const node = math.parse(`${limpio} = 0`);
+        const solved = math.simplify(node).evaluate();
 
-        if (soluciones.length > 0) {
-          soluciones.forEach(sol => {
-            const solLimpio = sol.toString().replace(/[()]/g, '').trim();
-            excluidos.push(solLimpio);
-            asintotasV.push(solLimpio);
-          });
-        } else {
-          excluidos.push(simplifiedStr);
+        let soluciones = [];
+        if (Array.isArray(solved)) {
+          soluciones = solved;
+        } else if (typeof solved === "number" || typeof solved === "string") {
+          soluciones = [solved];
         }
+
+        soluciones.forEach(sol => {
+          const valor = math.evaluate(sol.toString());
+          excluidos.push(valor.toString());
+          asintotasV.push(valor.toString());
+        });
+
       } catch (error) {
         excluidos.push(limpiarParentesis(exp));
       }
     }
 
-    // ✅ CORREGIDO: Mostrar dominio con comas en lugar de "o"
-    if (excluidos.length > 0) {
-      domStr = `x ∈ ℝ, x ≠ ${excluidos.join(", x ≠ ")}`;
+    if (excluidos.length === 1) {
+      domStr = `x ∈ ℝ, x ≠ ${excluidos[0]}`;
+    } else if (excluidos.length > 1) {
+      domStr = `x ∈ ℝ, x ≠ ${excluidos.join(" o x ≠ ")}`;
     }
 
-    // Procedimiento para rango
     procedimiento += `Ecuación original: y = ${input}\n`;
 
     try {
@@ -177,7 +178,6 @@ function analizar() {
       }
     } catch {}
 
-    // Evaluar tabla de valores
     for (let x of xVals) {
       try {
         let y = compiled.evaluate({ x });
@@ -193,7 +193,6 @@ function analizar() {
       }
     }
 
-    // Asíntota horizontal aproximada
     try {
       const limPos = compiled.evaluate({ x: 1e6 });
       const limNeg = compiled.evaluate({ x: -1e6 });
@@ -202,7 +201,6 @@ function analizar() {
       }
     } catch {}
 
-    // Mostrar resultados
     document.getElementById("dom").textContent = `D = { ${domStr} }`;
     document.getElementById("proc").textContent = procedimiento;
     document.getElementById("ran").textContent = rangoExcepcion
@@ -215,7 +213,6 @@ function analizar() {
 
     document.getElementById("tabla").innerHTML = tablaHTML;
 
-    // Graficar
     const trace = {
       x: xVals,
       y: yVals,
@@ -232,7 +229,6 @@ function analizar() {
       shapes: []
     };
 
-    // Asíntotas verticales
     asintotasV.forEach(x => {
       const xNum = Number(x);
       if (!isNaN(xNum)) {
@@ -247,7 +243,6 @@ function analizar() {
       }
     });
 
-    // Asíntota horizontal
     if (asintotaH !== null) {
       layout.shapes.push({
         type: "line",
