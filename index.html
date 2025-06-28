@@ -132,12 +132,9 @@ function analizar() {
     for (let exp of dominioExclusiones) {
       try {
         let limpio = limpiarParentesis(exp);
-
         const simplifiedNode = math.simplify(limpio);
         const simplifiedStr = simplifiedNode.toString();
-
-        const eqNode = math.parse(`${simplifiedStr} = 0`);
-        const soluciones = math.solve(eqNode, 'x');
+        const soluciones = math.evaluate(`solve(${simplifiedStr} = 0, x)`);
 
         if (soluciones.length > 0) {
           soluciones.forEach(sol => {
@@ -146,7 +143,7 @@ function analizar() {
             asintotasV.push(solLimpio);
           });
         } else {
-          excluidos.push(limpiarParentesis(exp));
+          excluidos.push(simplifiedStr);
         }
       } catch (error) {
         excluidos.push(limpiarParentesis(exp));
