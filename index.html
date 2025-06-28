@@ -1,31 +1,66 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Calculadora Avanzada de Funciones</title>
+  <meta charset="UTF-8" />
+  <title>Calculadora de Ecuaciones</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 30px; background: #f4f4f4; color: #222; }
-    input, button { width: 100%; padding: 10px; margin: 10px 0; font-size: 1rem; }
-    code { background: #e8e8e8; padding: 2px 4px; border-radius: 3px; }
-    table { border-collapse: collapse; width: 100%; max-width: 500px; margin-top: 10px; }
-    th, td { border: 1px solid #bbb; padding: 6px 12px; text-align: center; }
-    pre { background: #f0f0f0; padding: 10px; max-width: 700px; white-space: pre-wrap; }
-    #graph { margin-top: 30px; max-width: 700px; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 30px;
+      background: #f4f4f4;
+      color: #222;
+    }
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 1em;
+    }
+    code {
+      background: #e8e8e8;
+      padding: 3px 6px;
+      border-radius: 4px;
+    }
+    table {
+      border-collapse: collapse;
+      margin-top: 10px;
+      width: 100%;
+      max-width: 400px;
+    }
+    th, td {
+      border: 1px solid #bbb;
+      padding: 6px 12px;
+      text-align: center;
+    }
+    pre {
+      background: #f0f0f0;
+      padding: 10px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      max-width: 700px;
+    }
+    #graph {
+      margin-top: 30px;
+      max-width: 700px;
+      height: 400px;
+    }
   </style>
 </head>
 <body>
-  <h1>Calculadora Avanzada de Funciones</h1>
-  <input id="eq" placeholder="Ejemplo: 1 / (x + 2)" />
+
+  <h1>Calculadora de Ecuaciones</h1>
+
+  <input type="text" id="eq" placeholder="Ejemplo: 1 / (x + 2)" />
   <button onclick="analizar()">Calcular</button>
 
-  <h2>Resultados</h2>
+  <h2>Resultados:</h2>
   <p><strong>Dominio:</strong> <code id="dom"></code></p>
   <p><strong>Asíntotas verticales:</strong> <code id="asv"></code></p>
   <p><strong>Asíntotas horizontales:</strong> <code id="ash"></code></p>
   <p><strong>Rango estimado:</strong> <code id="ran"></code></p>
-  <p><strong>Procedimiento rango:</strong></p>
+  <p><strong>Procedimiento:</strong></p>
   <pre id="proc"></pre>
 
   <h3>Tabla de valores</h3>
@@ -34,92 +69,109 @@
     <tbody id="tabla"></tbody>
   </table>
 
-  <div id="graph" style="height:400px;"></div>
+  <div id="graph"></div>
 
   <script>
-  function analizar() {
-    const s = document.getElementById("eq").value.trim();
-    if (!s) return alert("Ingresa una función.");
-    const compiled = math.compile(s);
-    const excl = [];
-    const xs = math.range(-20, 20, 0.02).toArray();
+    function analizar() {
+      const input = document.getElementById("eq").value.trim();
+      if (!input) {
+        alert("Ingresa una ecuación válida.");
+        return;
+      }
 
-    // Dominio/asintotas verticales
-    xs.forEach(x => {
-      try {
-        const y1 = compiled.evaluate({ x });
-        const y2 = compiled.evaluate({ x + 0.02 });
-        if (!isFinite(y1)||!isFinite(y2)||Math.abs(y2-y1)>1e3) {
-          const xr = math.round(x,2);
-          if (!excl.includes(xr)) excl.push(xr);
+      const compiled = math.compile(input);
+      const xs = math.range(-20, 20, 0.1).toArray();
+      const excl = new Set();
+      const puntosX = [], puntosY = [];
+      let yMin = Infinity, yMax = -Infinity;
+
+      // Detectar asíntotas verticales (división por cero o explosión de valores)
+      xs.forEach(x => {
+        try {
+          const y = compiled.evaluate({ x });
+          if (!isFinite(y) || Math.abs(y) > 1e5) {
+            excl.add(x.toFixed(2));
+          } else {
+            puntosX.push(x);
+            puntosY.push(y);
+            yMin = Math.min(yMin, y);
+            yMax = Math.max(yMax, y);
+          }
+        } catch {
+          excl.add(x.toFixed(2));
         }
-      } catch {
-        const xr = math.round(x,2);
-        if (!excl.includes(xr)) excl.push(xr);
+      });
+
+      // Dominio y asíntotas
+      const exclSorted = Array.from(excl).map(Number).sort((a, b) => a - b);
+      const dominio = exclSorted.length
+        ? `x ∈ ℝ, x ≠ ${exclSorted.join(' y x ≠ ')}`
+        : 'x ∈ ℝ';
+      document.getElementById("dom").textContent = dominio;
+      document.getElementById("asv").textContent = exclSorted.map(x => `x = ${x}`).join(", ") || "Ninguna";
+
+      // Asíntota horizontal aproximada
+      let ah = "Ninguna";
+      try {
+        const y1 = compiled.evaluate({ x: 1e6 });
+        const y2 = compiled.evaluate({ x: -1e6 });
+        if (isFinite(y1) && isFinite(y2) && Math.abs(y1 - y2) < 0.1) {
+          ah = "y = " + math.round((y1 + y2) / 2, 5);
+        }
+      } catch {}
+      document.getElementById("ash").textContent = ah;
+
+      // Rango estimado
+      const rang = input.includes("1/(") || input.includes("1/(x")
+        ? "y ∈ ℝ, y ≠ 0"
+        : `Aproximadamente entre y = ${math.round(yMin, 3)} y y = ${math.round(yMax, 3)}`;
+      document.getElementById("ran").textContent = rang;
+
+      // Procedimiento mostrado
+      let proc = `Ecuación original: y = ${input}\n`;
+      if (input === "1 / (x + 2)") {
+        proc += `y(x + 2) = 1\n⇒ xy + 2y = 1\n⇒ x = (1 - 2y) / y\nRango: y ≠ 0`;
       }
-    });
+      document.getElementById("proc").textContent = proc;
 
-    const dom = excl.length
-      ? `x ∈ ℝ, x ≠ ` + excl.join(" y x ≠ ")
-      : "x ∈ ℝ";
-    document.getElementById("dom").textContent = dom;
-    document.getElementById("asv").textContent = excl.map(x=>`x = ${x}`).join(", ") || "Ninguna";
+      // Tabla de valores
+      const puntosTabla = [-10,-5,-3,-2,-1,0,1,2,3,5,10];
+      let tablaHTML = "";
+      puntosTabla.forEach(x => {
+        let y = "Indefinido";
+        try {
+          const val = compiled.evaluate({ x });
+          if (isFinite(val)) y = math.round(val, 5);
+        } catch {}
+        tablaHTML += `<tr><td>${x}</td><td>${y}</td></tr>`;
+      });
+      document.getElementById("tabla").innerHTML = tablaHTML;
 
-    // Asíntota horizontal
-    let ah = "";
-    try {
-      const y1 = compiled.evaluate({ x: 1e6 });
-      const y2 = compiled.evaluate({ x: -1e6 });
-      if (isFinite(y1) && isFinite(y2) && Math.abs(y1 - y2) < 0.01) {
-        ah = "y = " + math.round((y1+y2)/2,5);
+      // Gráfica
+      const shapes = exclSorted.map(x => ({
+        type: "line", x0: x, x1: x, y0: yMin, y1: yMax,
+        line: { dash: "dot", color: "red" }
+      }));
+      if (ah.startsWith("y = ")) {
+        const yval = parseFloat(ah.split("=")[1]);
+        shapes.push({
+          type: "line", x0: -20, x1: 20, y0: yval, y1: yval,
+          line: { dash: "dot", color: "blue" }
+        });
       }
-    } catch {}
-    document.getElementById("ash").textContent = ah || "Ninguna";
 
-    // Rango y procedimiento sencillo
-    let proc = "", rang = "";
-    proc += `f(x) = ${s}\n`;
-    if (s.includes("1/(")) {
-      proc += "Procedimiento simplificado para inversa.\n";
-      rang = "y ∈ ℝ, y ≠ 0";
-    } else {
-      rang = "Valor entre mínimos y máximos evaluados.";
+      Plotly.newPlot("graph", [{
+        x: puntosX,
+        y: puntosY,
+        mode: "lines",
+        line: { color: "green" }
+      }], {
+        title: "Gráfica de la función",
+        shapes,
+        xaxis: { title: "x" },
+        yaxis: { title: "f(x)" }
+      });
     }
-    document.getElementById("proc").textContent = proc;
-    document.getElementById("ran").textContent = rang;
-
-    // Tabla de valores
-    const tableXs = [-10,-5,-3,-2,-1,0,1,2,3,5,10];
-    const tbody = tableXs.map(x=>{
-      let y="NaN";
-      try { y = math.round(compiled.evaluate({ x }),5); } catch {}
-      return `<tr><td>${x}</td><td>${y}</td></tr>`;
-    }).join("");
-    document.getElementById("tabla").innerHTML = tbody;
-
-    // Gráfica
-    const plotX = [], plotY = [];
-    for (let x = -10; x <= 10; x += 0.1) {
-      try { plotY.push(compiled.evaluate({ x })); }
-      catch { plotY.push(null); }
-      plotX.push(x);
-    }
-    const shapes = [];
-    excl.forEach(v=>{
-      const xv = Number(v);
-      shapes.push({ type: "line", x0: xv, x1: xv, y0: -1e3, y1: 1e3, line:{dash:"dashdot",color:"red"} });
-    });
-    if (ah) {
-      const yv = +ah.split("=").pop();
-      shapes.push({type:"line",x0:-10,x1:10,y0:yv,y1:yv,line:{dash:"dashdot",color:"blue"}});
-    }
-
-    Plotly.newPlot("graph",[{
-      x: plotX, y: plotY, mode:"lines", line:{color:"green"}
-    }], {
-      title:"Gráfica de f(x)", xaxis:{title:"x"}, yaxis:{title:"y"}, shapes
-    });
-  }
   </script>
 </body>
 </html>
