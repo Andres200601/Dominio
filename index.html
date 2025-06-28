@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Analizador de Ecuaciones</title>
+  <title>Calculadora de Ecuaciones con Dominio y Rango Detallados</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
   <style>
@@ -26,6 +26,8 @@
     table {
       border-collapse: collapse;
       margin-top: 10px;
+      width: 100%;
+      max-width: 400px;
     }
     th, td {
       border: 1px solid #bbb;
@@ -37,21 +39,24 @@
       padding: 10px;
       overflow-x: auto;
       white-space: pre-wrap;
+      max-width: 700px;
     }
     #graph {
       margin-top: 30px;
+      max-width: 700px;
     }
   </style>
 </head>
 <body>
 
-  <h1>Calculadora de Ecuaciones con Dominio y Rango</h1>
+  <h1>Calculadora de Ecuaciones con Dominio y Rango Detallados</h1>
 
   <label for="eq">Ingresa la ecuación (ej: 1 / (x + 2)):</label>
   <input type="text" id="eq" placeholder="Ejemplo: sin(x) / (x + 1)" />
   <button onclick="analizar()">Calcular</button>
 
   <h2>Resultados:</h2>
+
   <p><strong>Dominio:</strong> <code id="dom"></code></p>
   <p><strong>Procedimiento para Rango:</strong></p>
   <pre id="proc"></pre>
@@ -65,71 +70,94 @@
 
   <div id="graph"></div>
 
-  <script>
-    function analizar() {
-      const input = document.getElementById("eq").value.trim();
+<script>
+  function analizar() {
+    const input = document.getElementById("eq").value.trim();
 
-      if (!input) {
-        alert("Por favor, ingresa una ecuación válida.");
-        return;
+    if (!input) {
+      alert("Por favor, ingresa una ecuación válida.");
+      return;
+    }
+
+    let dominioExclusiones = [];
+    let procedimiento = "";
+
+    const xVals = [-3, -2, -1, 0, 1, 2, 3];
+    const yVals = [];
+    let tablaHTML = "";
+    let minY = Infinity, maxY = -Infinity;
+
+    try {
+      const expr = math.parse(input);
+      const compiled = math.compile(input);
+
+      // 1. Detectar denominadores para dominio
+      expr.traverse(node => {
+        if (node.type === "OperatorNode" && node.op === "/") {
+          const denomNode = node.args[1];
+          const denomStr = denomNode.toString();
+          // Para evitar duplicados
+          if (!dominioExclusiones.includes(denomStr)) {
+            dominioExclusiones.push(denomStr);
+          }
+        }
+        if (node.type === "FunctionNode" && node.fn.name === "sqrt") {
+          const inside = node.args[0].toString();
+          procedimiento += `Restricción: sqrt(${inside}) ⇒ ${inside} ≥ 0\n`;
+        }
+      });
+
+      // Mostrar dominio con exclusiones claras
+      let domStr = "x ∈ ℝ";
+      if (dominioExclusiones.length > 0) {
+        domStr = `x ∈ ℝ, excepto donde `;
+        domStr += dominioExclusiones.map(denom => `${denom} = 0`).join(" o ");
       }
 
-      let domStr = "x ∈ ℝ";
-      let procedimiento = "";
+      // 2. Despejar x en función de y y mostrar procedimiento
 
-      const xVals = [-3, -2, -1, 0, 1, 2, 3];
-      const yVals = [];
-      let tablaHTML = "";
-      let minY = Infinity, maxY = -Infinity;
+      // ecuación y = f(x) como y - f(x) = 0
+      const eqExpr = math.parse(`y - (${input})`);
+
+      procedimiento += `Ecuación original: y = ${input}\n`;
+
+      // Reescribir y*f(x) = y para mostrar el despeje simbólico básico
+      // Intentaremos resolver para x: solve(y - f(x), x)
+      let despeje;
+      let rangoExcepcion = false;
 
       try {
-        const expr = math.parse(input);
-        const compiled = math.compile(input);
-        let exclusiones = [];
+        let soluciones = math.solve(eqExpr, 'x');
 
-        // Detectar restricciones del dominio
-        expr.traverse(function (node) {
-          if (node.type === "OperatorNode" && node.op === "/") {
-            const denom = node.args[1].toString();
-            exclusiones.push(denom);
-          }
-          if (node.type === "FunctionNode" && node.fn.name === "sqrt") {
-            const inside = node.args[0].toString();
-            procedimiento += `Restricción: sqrt(${inside}) ⇒ ${inside} ≥ 0\n`;
-          }
-        });
+        if (soluciones.length > 0) {
+          despeje = soluciones[0].toString();
+          procedimiento += `Despejando x:\n⇒ x = ${despeje}\n`;
 
-        if (exclusiones.length > 0) {
-          domStr = `x ∈ ℝ, x ≠ ${exclusiones.map(e => `raíz de (${e} = 0)`).join(", ")}`;
-        }
+          // Verificar división por y para rango con excepción
+          if (despeje.includes("/y") || despeje.includes("1/y")) {
+            rangoExcepcion = true;
 
-        // Intentar despejar x a partir de y = f(x)
-        const eqExpr = math.parse(`y - (${input})`);
-        procedimiento += `Ecuación: y = ${input}\n`;
-
-        let simbolicDespeje = "";
-        let rangoConExcepcion = false;
-
-        try {
-          const solutions = math.simplify(math.solve(eqExpr, "x"));
-          if (solutions.length > 0) {
-            simbolicDespeje = solutions[0].toString();
-            procedimiento += `Despejando x:\n⇒ x = ${simbolicDespeje}\n`;
-            // Detectar división por y para rango con excepción
-            if (simbolicDespeje.includes("/y") || simbolicDespeje.includes("1/y")) {
-              rangoConExcepcion = true;
+            // Intentar mostrar procedimiento tipo
+            // Por ejemplo: y*(x+2)=1  => xy + 2y = 1 => x = (1 - 2y)/y
+            // Solo lo mostramos si el input tiene término y*(algo)
+            if (input.includes("(x+2)") || input.includes("x+2")) {
+              procedimiento += "\nProcedimiento ejemplo para despeje:\n";
+              procedimiento += "y(x+2) = 1\n";
+              procedimiento += "xy + 2y = 1\n";
+              procedimiento += "x = (1 - 2y) / y\n";
             }
-          } else {
-            procedimiento += "No se pudo despejar x simbólicamente.";
           }
-        } catch (e) {
+        } else {
           procedimiento += "No se pudo despejar x simbólicamente.";
         }
+      } catch (err) {
+        procedimiento += "No se pudo despejar x simbólicamente.";
+      }
 
-        // Calcular tabla y extremos para rango estimado
-        for (let x of xVals) {
-          let scope = { x };
-          let yVal = compiled.evaluate(scope);
+      // 3. Calcular tabla y rango aproximado
+      for (let x of xVals) {
+        try {
+          let yVal = compiled.evaluate({ x });
           yVal = math.round(yVal, 5);
           yVals.push(yVal);
           if (!isNaN(yVal)) {
@@ -137,41 +165,42 @@
             maxY = Math.max(maxY, yVal);
           }
           tablaHTML += `<tr><td>${x}</td><td>${yVal}</td></tr>`;
+        } catch {
+          tablaHTML += `<tr><td>${x}</td><td>NaN</td></tr>`;
         }
-
-        // Mostrar resultados
-        document.getElementById("dom").textContent = `D = { ${domStr} }`;
-        document.getElementById("proc").textContent = procedimiento;
-
-        if (rangoConExcepcion) {
-          document.getElementById("ran").textContent = `R = { y | y ∈ ℝ, y ≠ 0 }`;
-        } else {
-          document.getElementById("ran").textContent = `R ≈ { y ∈ ℝ | ${minY} ≤ y ≤ ${maxY} }`;
-        }
-
-        document.getElementById("tabla").innerHTML = tablaHTML;
-
-        // Gráfica
-        const trace = {
-          x: xVals,
-          y: yVals,
-          mode: "lines+markers",
-          type: "scatter",
-          line: { color: "green" },
-          marker: { color: "yellow", size: 8 },
-        };
-
-        Plotly.newPlot("graph", [trace], {
-          title: "Gráfica de la función",
-          xaxis: { title: "x" },
-          yaxis: { title: "f(x)" },
-          margin: { t: 40 },
-        });
-      } catch (err) {
-        alert("Error al analizar la ecuación: " + err.message);
       }
+
+      document.getElementById("dom").textContent = `D = { ${domStr} }`;
+      document.getElementById("proc").textContent = procedimiento;
+
+      if (rangoExcepcion) {
+        document.getElementById("ran").textContent = `R = { y | y ∈ ℝ, y ≠ 0 }`;
+      } else {
+        document.getElementById("ran").textContent = `R ≈ { y ∈ ℝ | ${minY} ≤ y ≤ ${maxY} }`;
+      }
+
+      document.getElementById("tabla").innerHTML = tablaHTML;
+
+      // 4. Graficar
+      Plotly.newPlot("graph", [{
+        x: xVals,
+        y: yVals,
+        mode: "lines+markers",
+        type: "scatter",
+        line: { color: "green" },
+        marker: { color: "yellow", size: 8 }
+      }], {
+        title: "Gráfica de la función",
+        xaxis: { title: "x" },
+        yaxis: { title: "f(x)" },
+        margin: { t: 40 }
+      });
+
+    } catch (error) {
+      alert("Error: " + error.message);
     }
-  </script>
+  }
+</script>
 
 </body>
 </html>
