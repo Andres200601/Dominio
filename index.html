@@ -98,16 +98,18 @@
         }
 
         // Despejar x en función de y (si es posible)
-        const y = math.parse("y");
-        const fx = math.parse(input);
-        const eq = new math.EqualNode(y, fx);
+        const eqExpr = math.parse(`y - (${input})`);
         procedimiento += `Ecuación: y = ${input}\n`;
 
         try {
-          const solved = math.simplify(math.algebra.solve(eq, 'x')[0].toString());
-          procedimiento += `Despejando x:\n⇒ x = ${solved}\n`;
-          if (solved.toString().includes("/y")) {
-            rango = "y ∈ ℝ, y ≠ 0";
+          const solutions = math.simplify(math.solve(eqExpr, 'x'));
+          if (solutions.length > 0) {
+            procedimiento += `Despejando x:\n⇒ x = ${solutions[0]}\n`;
+            if (solutions[0].toString().includes("/y")) {
+              rango = "y ∈ ℝ, y ≠ 0";
+            }
+          } else {
+            procedimiento += "No se pudo despejar x simbólicamente.";
           }
         } catch (e) {
           procedimiento += "No se pudo despejar x simbólicamente.";
@@ -138,8 +140,8 @@
           y: yVals,
           mode: "lines+markers",
           type: "scatter",
-          line: { color: "pale blue" },
-          marker: { color: "light red", size: 8 }
+          line: { color: "turquoise" },
+          marker: { color: "peach", size: 8 }
         };
 
         Plotly.newPlot("graph", [trace], {
