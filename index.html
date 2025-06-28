@@ -94,7 +94,7 @@ function analizar() {
     const expr = math.parse(input);
     const compiled = math.compile(input);
 
-    // DOMINIO y posibles asíntotas verticales
+    // Detectar denominadores para dominio
     expr.traverse(node => {
       if (node.type === "OperatorNode" && node.op === "/") {
         const denom = node.args[1].toString();
@@ -104,7 +104,7 @@ function analizar() {
       }
     });
 
-    // Resolver exclusiones de dominio y asíntotas verticales
+    // Resolver exclusiones de dominio
     let domStr = "x ∈ ℝ";
     let excluidos = [];
     for (let exp of dominioExclusiones) {
@@ -112,13 +112,11 @@ function analizar() {
         const simplified = math.simplify(exp);
         const node = math.parse(`${simplified} = 0`);
         const soluciones = math.solve(node, 'x');
-
         soluciones.forEach(sol => {
-          const val = math.evaluate(sol.toString());
-          excluidos.push(val.toString());
+          const val = sol.toString(); // Mantener como texto limpio
+          excluidos.push(val);
           asintotasV.push(val);
         });
-
       } catch {
         excluidos.push(`(${exp}) = 0`);
       }
@@ -130,7 +128,7 @@ function analizar() {
       domStr = `x ∈ ℝ, x ≠ ${excluidos.join(" o x ≠ ")}`;
     }
 
-    // PROCEDIMIENTO PARA RANGO
+    // Procedimiento para rango
     procedimiento += `Ecuación original: y = ${input}\n`;
 
     try {
@@ -152,7 +150,7 @@ function analizar() {
       }
     } catch {}
 
-    // Tabla de valores y rango aproximado
+    // Evaluar tabla de valores
     for (let x of xVals) {
       try {
         let y = compiled.evaluate({ x });
@@ -168,7 +166,7 @@ function analizar() {
       }
     }
 
-    // Asíntota horizontal (aproximada)
+    // Asíntota horizontal aproximada
     try {
       const limPos = compiled.evaluate({ x: 1e6 });
       const limNeg = compiled.evaluate({ x: -1e6 });
@@ -183,7 +181,6 @@ function analizar() {
     document.getElementById("ran").textContent = rangoExcepcion
       ? `R = { y | y ∈ ℝ, y ≠ 0 }`
       : `R ≈ { y ∈ ℝ | ${minY} ≤ y ≤ ${maxY} }`;
-
     document.getElementById("asv").textContent =
       asintotasV.length > 0 ? asintotasV.map(x => `x = ${x}`).join(", ") : "Ninguna";
     document.getElementById("ash").textContent =
@@ -191,7 +188,7 @@ function analizar() {
 
     document.getElementById("tabla").innerHTML = tablaHTML;
 
-    // Gráfica
+    // Graficar
     const trace = {
       x: xVals,
       y: yVals,
@@ -208,17 +205,19 @@ function analizar() {
       shapes: []
     };
 
+    // Asíntotas verticales
     asintotasV.forEach(x => {
       layout.shapes.push({
         type: "line",
-        x0: x,
-        x1: x,
+        x0: Number(x),
+        x1: Number(x),
         y0: minY,
         y1: maxY,
         line: { dash: "dot", color: "red" }
       });
     });
 
+    // Asíntota horizontal
     if (asintotaH !== null) {
       layout.shapes.push({
         type: "line",
