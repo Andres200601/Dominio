@@ -1,79 +1,80 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<title>Calculadora de Ecuaciones con Dominio y Rango Detallados</title>
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    margin: 30px;
-    background: #f4f4f4;
-    color: #222;
-  }
-  input, button {
-    width: 100%;
-    padding: 12px;
-    margin: 10px 0;
-    font-size: 1em;
-  }
-  code {
-    background: #e8e8e8;
-    padding: 3px 6px;
-    border-radius: 4px;
-  }
-  table {
-    border-collapse: collapse;
-    margin-top: 10px;
-    width: 100%;
-    max-width: 400px;
-  }
-  th, td {
-    border: 1px solid #bbb;
-    padding: 6px 12px;
-    text-align: center;
-  }
-  pre {
-    background: #f0f0f0;
-    padding: 10px;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    max-width: 700px;
-  }
-  #graph {
-    margin-top: 30px;
-    max-width: 700px;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <title>Calculadora de Ecuaciones con Dominio, Rango y Asíntotas</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 30px;
+      background: #f4f4f4;
+      color: #222;
+    }
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 1em;
+    }
+    code {
+      background: #e8e8e8;
+      padding: 3px 6px;
+      border-radius: 4px;
+    }
+    table {
+      border-collapse: collapse;
+      margin-top: 10px;
+      width: 100%;
+      max-width: 400px;
+    }
+    th, td {
+      border: 1px solid #bbb;
+      padding: 6px 12px;
+      text-align: center;
+    }
+    pre {
+      background: #f0f0f0;
+      padding: 10px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      max-width: 700px;
+    }
+    #graph {
+      margin-top: 30px;
+      max-width: 700px;
+    }
+  </style>
 </head>
 <body>
 
-<h1>Calculadora de Ecuaciones con Dominio y Rango Detallados</h1>
+  <h1>Calculadora de Ecuaciones</h1>
 
-<label for="eq">Ingresa la ecuación (ej: 1 / (x + 2)):</label>
-<input type="text" id="eq" placeholder="Ejemplo: sin(x) / (x + 1)" />
-<button onclick="analizar()">Calcular</button>
+  <label for="eq">Ingresa la ecuación (ej: 1 / (x + 2)):</label>
+  <input type="text" id="eq" placeholder="Ejemplo: sin(x) / (x + 1)" />
+  <button onclick="analizar()">Calcular</button>
 
-<h2>Resultados:</h2>
+  <h2>Resultados:</h2>
+  <p><strong>Dominio:</strong> <code id="dom"></code></p>
+  <p><strong>Asíntotas verticales:</strong> <code id="asv"></code></p>
+  <p><strong>Asíntotas horizontales (aproximadas):</strong> <code id="ash"></code></p>
 
-<p><strong>Dominio:</strong> <code id="dom"></code></p>
-<p><strong>Procedimiento para Rango:</strong></p>
-<pre id="proc"></pre>
-<p><strong>Rango estimado:</strong> <code id="ran"></code></p>
+  <p><strong>Procedimiento para Rango:</strong></p>
+  <pre id="proc"></pre>
+  <p><strong>Rango estimado:</strong> <code id="ran"></code></p>
 
-<h3>Tabla de valores (x, f(x))</h3>
-<table>
-<thead><tr><th>x</th><th>f(x)</th></tr></thead>
-<tbody id="tabla"></tbody>
-</table>
+  <h3>Tabla de valores (x, f(x))</h3>
+  <table>
+    <thead><tr><th>x</th><th>f(x)</th></tr></thead>
+    <tbody id="tabla"></tbody>
+  </table>
 
-<div id="graph"></div>
+  <div id="graph"></div>
 
 <script>
 function analizar() {
   const input = document.getElementById("eq").value.trim();
-
   if (!input) {
     alert("Por favor, ingresa una ecuación válida.");
     return;
@@ -81,8 +82,9 @@ function analizar() {
 
   let dominioExclusiones = [];
   let procedimiento = "";
-
-  const xVals = [-3, -2, -1, 0, 1, 2, 3];
+  let asintotasV = [];
+  let asintotaH = null;
+  const xVals = [-10, -5, -3, -2, -1, 0, 1, 2, 3, 5, 10];
   const yVals = [];
   let tablaHTML = "";
   let minY = Infinity, maxY = -Infinity;
@@ -92,46 +94,50 @@ function analizar() {
     const expr = math.parse(input);
     const compiled = math.compile(input);
 
-    // Detectar denominadores para dominio
+    // DOMINIO y ASÍNTOTAS VERTICALES
     expr.traverse(node => {
       if (node.type === "OperatorNode" && node.op === "/") {
-        const denomNode = node.args[1];
-        const denomStr = denomNode.toString();
-        if (!dominioExclusiones.includes(denomStr)) {
-          dominioExclusiones.push(denomStr);
+        const denom = node.args[1].toString();
+        if (!dominioExclusiones.includes(denom)) {
+          dominioExclusiones.push(denom);
         }
-      }
-      if (node.type === "FunctionNode" && node.fn.name === "sqrt") {
-        const inside = node.args[0].toString();
-        procedimiento += `Restricción: sqrt(${inside}) ⇒ ${inside} ≥ 0\n`;
       }
     });
 
-    // Mostrar dominio
     let domStr = "x ∈ ℝ";
-    if (dominioExclusiones.length > 0) {
-      domStr = `x ∈ ℝ, excepto donde `;
-      domStr += dominioExclusiones.map(denom => `(${denom}) = 0`).join(" o ");
+    let excluidos = [];
+    for (let exp of dominioExclusiones) {
+      try {
+        const nodo = math.parse(`${exp} = 0`);
+        const solucion = math.solve(nodo, 'x');
+        if (solucion.length > 0) {
+          excluidos.push(...solucion.map(s => s.toString()));
+          asintotasV.push(...solucion.map(s => Number(s)));
+        } else {
+          excluidos.push(`(${exp}) = 0`);
+        }
+      } catch {
+        excluidos.push(`(${exp}) = 0`);
+      }
+    }
+    if (excluidos.length === 1) {
+      domStr = `x ∈ ℝ, x ≠ ${excluidos[0]}`;
+    } else if (excluidos.length > 1) {
+      domStr = `x ∈ ℝ, x ≠ ${excluidos.join(" o x ≠ ")}`;
     }
 
+    // PROCEDIMIENTO PARA RANGO
     procedimiento += `Ecuación original: y = ${input}\n`;
 
-    // Procedimiento especial para funciones 1/(x + c)
+    // Detectar si es 1/(x+c) para despeje manual
     try {
-      const fracCheck = math.parse(input);
-
-      if (fracCheck.type === "OperatorNode" && fracCheck.op === "/") {
-        const numer = fracCheck.args[0].toString();
-        let denom = fracCheck.args[1].toString();
-
-        // Quitar paréntesis si existen en denominador para análisis simple
-        denom = denom.replace(/^\(|\)$/g, "").trim();
-
-        // Regex para detectar x + c o x - c (c número)
-        const denomMatch = denom.match(/^x\s*([\+\-])\s*(\d+)$/);
-        if (numer === "1" && denomMatch) {
-          const signo = denomMatch[1];
-          const num = denomMatch[2];
+      const parsed = math.parse(input);
+      if (parsed.type === "OperatorNode" && parsed.op === "/") {
+        const numer = parsed.args[0].toString();
+        let denom = parsed.args[1].toString().replace(/^\(|\)$/g, "").trim();
+        const match = denom.match(/^x\s*([\+\-])\s*(\d+)$/);
+        if (numer === "1" && match) {
+          const signo = match[1], num = match[2];
           procedimiento +=
             `\nProcedimiento especial para despeje:\n` +
             `y = 1/(x ${signo} ${num})\n` +
@@ -141,51 +147,89 @@ function analizar() {
           rangoExcepcion = true;
         }
       }
-    } catch (e) {
-      // No hacer nada
-    }
+    } catch {}
 
-    // Calcular tabla y rango aproximado
+    // TABLA Y RANGO ESTIMADO
     for (let x of xVals) {
       try {
-        let yVal = compiled.evaluate({ x });
-        yVal = math.round(yVal, 5);
-        yVals.push(yVal);
-        if (!isNaN(yVal)) {
-          minY = Math.min(minY, yVal);
-          maxY = Math.max(maxY, yVal);
+        let y = compiled.evaluate({ x });
+        y = math.round(y, 5);
+        yVals.push(y);
+        if (!isNaN(y)) {
+          minY = Math.min(minY, y);
+          maxY = Math.max(maxY, y);
         }
-        tablaHTML += `<tr><td>${x}</td><td>${yVal}</td></tr>`;
+        tablaHTML += `<tr><td>${x}</td><td>${y}</td></tr>`;
       } catch {
         tablaHTML += `<tr><td>${x}</td><td>NaN</td></tr>`;
       }
     }
 
+    // ASÍNTOTA HORIZONTAL (aproximada con valores grandes)
+    try {
+      const limPos = compiled.evaluate({ x: 1e6 });
+      const limNeg = compiled.evaluate({ x: -1e6 });
+      if (Math.abs(limPos - limNeg) < 0.1) {
+        asintotaH = math.round((limPos + limNeg) / 2, 5);
+      }
+    } catch {}
+
+    // MOSTRAR RESULTADOS
     document.getElementById("dom").textContent = `D = { ${domStr} }`;
     document.getElementById("proc").textContent = procedimiento;
+    document.getElementById("ran").textContent = rangoExcepcion
+      ? `R = { y | y ∈ ℝ, y ≠ 0 }`
+      : `R ≈ { y ∈ ℝ | ${minY} ≤ y ≤ ${maxY} }`;
 
-    if (rangoExcepcion) {
-      document.getElementById("ran").textContent = `R = { y | y ∈ ℝ, y ≠ 0 }`;
-    } else {
-      document.getElementById("ran").textContent = `R ≈ { y ∈ ℝ | ${minY} ≤ y ≤ ${maxY} }`;
-    }
+    document.getElementById("asv").textContent =
+      asintotasV.length > 0 ? asintotasV.map(x => `x = ${x}`).join(", ") : "Ninguna";
+    document.getElementById("ash").textContent =
+      asintotaH !== null ? `y = ${asintotaH}` : "No se detectó";
 
     document.getElementById("tabla").innerHTML = tablaHTML;
 
-    // Graficar
-    Plotly.newPlot("graph", [{
+    // GRAFICAR
+    const trace = {
       x: xVals,
       y: yVals,
       mode: "lines+markers",
       type: "scatter",
       line: { color: "green" },
       marker: { color: "yellow", size: 8 }
-    }], {
+    };
+
+    const layout = {
       title: "Gráfica de la función",
       xaxis: { title: "x" },
       yaxis: { title: "f(x)" },
-      margin: { t: 40 }
+      shapes: []
+    };
+
+    // Agregar asíntotas verticales
+    asintotasV.forEach(x => {
+      layout.shapes.push({
+        type: "line",
+        x0: x,
+        x1: x,
+        y0: minY,
+        y1: maxY,
+        line: { dash: "dot", color: "red" }
+      });
     });
+
+    // Agregar asíntota horizontal
+    if (asintotaH !== null) {
+      layout.shapes.push({
+        type: "line",
+        x0: Math.min(...xVals),
+        x1: Math.max(...xVals),
+        y0: asintotaH,
+        y1: asintotaH,
+        line: { dash: "dot", color: "blue" }
+      });
+    }
+
+    Plotly.newPlot("graph", [trace], layout);
 
   } catch (error) {
     alert("Error: " + error.message);
