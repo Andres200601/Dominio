@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Calculadora de Ecuaciones</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
@@ -104,20 +104,29 @@ function analizar() {
       }
     });
 
-    // Resolver exclusiones de dominio
+    // Resolver exclusiones de dominio (corregido para evitar paréntesis extra)
     let domStr = "x ∈ ℝ";
     let excluidos = [];
+
     for (let exp of dominioExclusiones) {
       try {
-        const simplified = math.simplify(exp);
-        const node = math.parse(`${simplified} = 0`);
-        const soluciones = math.solve(node, 'x');
+        // Simplificamos la expresión para eliminar paréntesis extra
+        const simplifiedNode = math.simplify(exp);
+        const simplifiedStr = simplifiedNode.toString();
+
+        // Creamos la ecuación simplifiedStr = 0
+        const eqNode = math.parse(`${simplifiedStr} = 0`);
+        const soluciones = math.solve(eqNode, 'x');
+
         soluciones.forEach(sol => {
-          const val = sol.toString(); // Mantener como texto limpio
-          excluidos.push(val);
-          asintotasV.push(val);
+          // Convertimos solución a string sin evaluar para que salga limpia
+          const solStr = sol.toString();
+
+          excluidos.push(solStr);
+          asintotasV.push(solStr);
         });
-      } catch {
+      } catch (error) {
+        // Si no puede resolver, mostrar la condición original
         excluidos.push(`(${exp}) = 0`);
       }
     }
@@ -207,14 +216,17 @@ function analizar() {
 
     // Asíntotas verticales
     asintotasV.forEach(x => {
-      layout.shapes.push({
-        type: "line",
-        x0: Number(x),
-        x1: Number(x),
-        y0: minY,
-        y1: maxY,
-        line: { dash: "dot", color: "red" }
-      });
+      const xNum = Number(x);
+      if (!isNaN(xNum)) {
+        layout.shapes.push({
+          type: "line",
+          x0: xNum,
+          x1: xNum,
+          y0: minY,
+          y1: maxY,
+          line: { dash: "dot", color: "red" }
+        });
+      }
     });
 
     // Asíntota horizontal
