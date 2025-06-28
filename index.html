@@ -92,7 +92,7 @@
       const expr = math.parse(input);
       const compiled = math.compile(input);
 
-      // 1. Detectar denominadores para dominio
+      // Detectar denominadores para dominio
       expr.traverse(node => {
         if (node.type === "OperatorNode" && node.op === "/") {
           const denomNode = node.args[1];
@@ -107,31 +107,34 @@
         }
       });
 
-      // Mostrar dominio con exclusiones claras
+      // Mostrar dominio
       let domStr = "x ∈ ℝ";
       if (dominioExclusiones.length > 0) {
         domStr = `x ∈ ℝ, excepto donde `;
         domStr += dominioExclusiones.map(denom => `(${denom}) = 0`).join(" o ");
       }
 
-      // 2. Procedimiento especial para funciones tipo 1/(x + c)
+      // Procedimiento especial para funciones 1/(x + c)
       let procedimientoExtra = "";
       try {
         const fracCheck = math.parse(input);
 
         if (fracCheck.type === "OperatorNode" && fracCheck.op === "/") {
           const numer = fracCheck.args[0].toString();
-          const denom = fracCheck.args[1].toString();
+          let denom = fracCheck.args[1].toString();
 
-          // Detectar denominador lineal con x
+          // Quitar paréntesis si existen en denominador para análisis simple
+          denom = denom.replace(/^\(|\)$/g, "").trim();
+
+          // Regex para detectar x + c o x - c (c número)
           const denomMatch = denom.match(/^x\s*([\+\-])\s*(\d+)$/);
           if (numer === "1" && denomMatch) {
             const signo = denomMatch[1];
             const num = denomMatch[2];
             procedimientoExtra +=
               `\nProcedimiento especial para despeje:\n` +
-              `y = 1/(x${signo}${num})\n` +
-              `⇒ y(x${signo}${num}) = 1\n` +
+              `y = 1/(x ${signo} ${num})\n` +
+              `⇒ y(x ${signo} ${num}) = 1\n` +
               `⇒ xy ${signo} ${num}y = 1\n` +
               `⇒ x = (1 ${signo === "+" ? "-" : "+"} ${num}y) / y\n`;
             rangoExcepcion = true;
@@ -142,7 +145,7 @@
       }
       procedimiento += procedimientoExtra;
 
-      // 3. Calcular tabla y rango aproximado
+      // Calcular tabla y rango aproximado
       for (let x of xVals) {
         try {
           let yVal = compiled.evaluate({ x });
@@ -169,7 +172,7 @@
 
       document.getElementById("tabla").innerHTML = tablaHTML;
 
-      // 4. Graficar
+      // Graficar
       Plotly.newPlot("graph", [{
         x: xVals,
         y: yVals,
