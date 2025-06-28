@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Calculadora de Ecuaciones con Dominio, Rango y Asíntotas</title>
+  <title>Calculadora de Ecuaciones</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
   <style>
@@ -94,7 +94,7 @@ function analizar() {
     const expr = math.parse(input);
     const compiled = math.compile(input);
 
-    // DOMINIO y ASÍNTOTAS VERTICALES
+    // DOMINIO y posibles asíntotas verticales
     expr.traverse(node => {
       if (node.type === "OperatorNode" && node.op === "/") {
         const denom = node.args[1].toString();
@@ -104,26 +104,22 @@ function analizar() {
       }
     });
 
+    // Resolver exclusiones de dominio y asíntotas verticales
     let domStr = "x ∈ ℝ";
-let excluidos = [];
-for (let exp of dominioExclusiones) {
-  try {
-    const soluciones = math.solve(math.parse(`${exp} = 0`), 'x');
-    soluciones.forEach(sol => {
-      const val = math.evaluate(sol.toString());
-      excluidos.push(val.toString());
-      asintotasV.push(val);
-    });
-  } catch {
-    excluidos.push(`(${exp}) = 0`);
-  }
-}
+    let excluidos = [];
+    for (let exp of dominioExclusiones) {
+      try {
+        const soluciones = math.solve(math.parse(`${exp} = 0`), 'x');
+        soluciones.forEach(sol => {
+          const val = math.evaluate(sol.toString());
+          excluidos.push(val.toString());
+          asintotasV.push(val);
+        });
+      } catch {
+        excluidos.push(`(${exp}) = 0`);
+      }
+    }
 
-if (excluidos.length === 1) {
-  domStr = `x ∈ ℝ, x ≠ ${excluidos[0]}`;
-} else if (excluidos.length > 1) {
-  domStr = `x ∈ ℝ, x ≠ ${excluidos.join(" o x ≠ ")}`;
-}
     if (excluidos.length === 1) {
       domStr = `x ∈ ℝ, x ≠ ${excluidos[0]}`;
     } else if (excluidos.length > 1) {
@@ -133,7 +129,6 @@ if (excluidos.length === 1) {
     // PROCEDIMIENTO PARA RANGO
     procedimiento += `Ecuación original: y = ${input}\n`;
 
-    // Detectar si es 1/(x+c) para despeje manual
     try {
       const parsed = math.parse(input);
       if (parsed.type === "OperatorNode" && parsed.op === "/") {
@@ -153,7 +148,7 @@ if (excluidos.length === 1) {
       }
     } catch {}
 
-    // TABLA Y RANGO ESTIMADO
+    // Tabla de valores y rango aproximado
     for (let x of xVals) {
       try {
         let y = compiled.evaluate({ x });
@@ -169,7 +164,7 @@ if (excluidos.length === 1) {
       }
     }
 
-    // ASÍNTOTA HORIZONTAL (aproximada con valores grandes)
+    // Asíntota horizontal (aproximada)
     try {
       const limPos = compiled.evaluate({ x: 1e6 });
       const limNeg = compiled.evaluate({ x: -1e6 });
@@ -178,7 +173,7 @@ if (excluidos.length === 1) {
       }
     } catch {}
 
-    // MOSTRAR RESULTADOS
+    // Mostrar resultados
     document.getElementById("dom").textContent = `D = { ${domStr} }`;
     document.getElementById("proc").textContent = procedimiento;
     document.getElementById("ran").textContent = rangoExcepcion
@@ -192,7 +187,7 @@ if (excluidos.length === 1) {
 
     document.getElementById("tabla").innerHTML = tablaHTML;
 
-    // GRAFICAR
+    // Graficar
     const trace = {
       x: xVals,
       y: yVals,
@@ -209,7 +204,6 @@ if (excluidos.length === 1) {
       shapes: []
     };
 
-    // Agregar asíntotas verticales
     asintotasV.forEach(x => {
       layout.shapes.push({
         type: "line",
@@ -221,7 +215,6 @@ if (excluidos.length === 1) {
       });
     });
 
-    // Agregar asíntota horizontal
     if (asintotaH !== null) {
       layout.shapes.push({
         type: "line",
